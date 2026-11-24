@@ -96,7 +96,7 @@
         {% endif %}
       </div>
       <div class="goal-title">{{ t2.titulo_tarefa }}</div>
-      <div class="goal-meta">{{ t2.motivo_recomendacao }}</div>
+      <div class="goal-meta">{{ t2.motivo_recomendacao | urlize(40, true, target='_blank') }}</div>
     </div>
     <div class="goal-actions">
       {% if t2.status_tarefa == 'CONCLUIDA' %}

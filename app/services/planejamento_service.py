@@ -587,17 +587,30 @@ def gerar_ou_obter_meu_dia(
         # =====================================================================
         # ETAPA 2 — PORTUGUÊS TODO DIA + 1 MATÉRIA DA FASE + DOSE TRANQUILA ANPD (DADOS & TI)
         # =====================================================================
-        # 2A. BLOCO FIXO DIÁRIO: LÍNGUA PORTUGUESA (CEBRASPE + IAUPE)
+        # 2A. BLOCO FIXO DIÁRIO: LÍNGUA PORTUGUESA (META 1 -> META 2 -> META 3...)
         disc_port = disc_by_cod.get("PORT")
         if disc_port:
-            tops_port = db.scalars(
-                select(Topico)
-                .where(Topico.disciplina_id == disc_port.id)
-                .order_by(Topico.codigo_estavel.asc())
-            ).all()
+            tops_port = list(
+                db.scalars(
+                    select(Topico)
+                    .where(Topico.disciplina_id == disc_port.id)
+                    .order_by(Topico.codigo_estavel.asc())
+                ).all()
+            )
             if tops_port:
-                top_port = tops_port[hoje.toordinal() % len(tops_port)]
+                tops_port.sort(
+                    key=lambda t: (
+                        0 if t.status_estudo in ("NAO_INICIADO", "MATERIAL_LOCALIZADO") else 1,
+                        t.codigo_estavel,
+                    )
+                )
+                top_port = tops_port[0]
                 disciplinas_do_dia_ids.append(disc_port.id)
+                resumo_port = (
+                    top_port.descricao_objetiva
+                    if top_port.descricao_objetiva
+                    else "Bloco fixo diário • Foco Cebraspe e IAUPE (SEFAZ-PE)."
+                )
                 db.add(
                     TarefaCronograma(
                         data_programada=hoje,
@@ -611,12 +624,12 @@ def gerar_ou_obter_meu_dia(
                         duracao_planejada_minutos=45,
                         questoes_planejadas=15,
                         status_tarefa="PENDENTE",
-                        motivo_recomendacao="Bloco fixo diário • Foco Cebraspe (reescrita, coesão, sintaxe) e IAUPE (SEFAZ-PE).",
+                        motivo_recomendacao=resumo_port,
                     )
                 )
                 ordem_seq += 1
 
-        # 2B. MATÉRIA DO DIA = foco da semana do plano de 60 dias
+        # 2B. MATÉRIA DO DIA = foco da semana do plano de 60 dias (META 1 -> META 2 -> META 3...)
         fase_atual = trilha["fase_codigo"]
         codigos_fase = trilha["codigos_materia"]
         if trilha["semana"]:
@@ -633,11 +646,10 @@ def gerar_ou_obter_meu_dia(
                 )
             ).all()
         )
-        # Primeiro o que ainda não foi estudado; depois o que mais pesa
+        # Ordem estrita de Metas (Meta 1 -> Meta 2 -> Meta 3...): primeiro não estudadas, depois código estável crescente
         candidatos_fase.sort(
             key=lambda t: (
                 0 if t.status_estudo in ("NAO_INICIADO", "MATERIAL_LOCALIZADO") else 1,
-                -t.score_importancia,
                 t.codigo_estavel,
             )
         )
@@ -657,6 +669,11 @@ def gerar_ou_obter_meu_dia(
                 if d_base and d_base.eixo_associado == "EIXO_2_ANPD_TI"
                 else "EIXO_1_SEFAZ_PE"
             )
+            resumo_base = (
+                f"{etiqueta_fase} • {top_base.descricao_objetiva}"
+                if top_base.descricao_objetiva
+                else etiqueta_fase
+            )
             db.add(
                 TarefaCronograma(
                     data_programada=hoje,
@@ -670,26 +687,39 @@ def gerar_ou_obter_meu_dia(
                     duracao_planejada_minutos=60,
                     questoes_planejadas=15,
                     status_tarefa="PENDENTE",
-                    motivo_recomendacao=etiqueta_fase,
+                    motivo_recomendacao=resumo_base,
                 )
             )
             ordem_seq += 1
 
-        # 2C. ANPD EM RITMO LEVE: três sessões semanais, sem competir com a base.
+        # 2C. ANPD EM RITMO LEVE: três sessões semanais (Ter/Qui/Sáb), progredindo Meta 1 -> Meta 2 -> Meta 3...
         if fase_atual != "FASE_3_ACELERACAO_ANPD" and trilha["anpd_hoje"]:
             codigos_ti = ["TI_CD_EST", "TI_ENG_DADOS", "TI_IA", "TI_GERAL"]
             ids_ti = [disc_by_cod[c].id for c in codigos_ti if c in disc_by_cod]
-            tops_ti = db.scalars(
-                select(Topico)
-                .where(
-                    Topico.disciplina_id.in_(ids_ti),
-                    Topico.status_estudo != "DOMINADO",
-                )
-                .order_by(Topico.codigo_estavel.asc())
-            ).all()
+            tops_ti = list(
+                db.scalars(
+                    select(Topico)
+                    .where(
+                        Topico.disciplina_id.in_(ids_ti),
+                        Topico.status_estudo != "DOMINADO",
+                    )
+                    .order_by(Topico.codigo_estavel.asc())
+                ).all()
+            )
             if tops_ti:
-                top_ti = tops_ti[hoje.toordinal() % len(tops_ti)]
+                tops_ti.sort(
+                    key=lambda t: (
+                        0 if t.status_estudo in ("NAO_INICIADO", "MATERIAL_LOCALIZADO") else 1,
+                        t.codigo_estavel,
+                    )
+                )
+                top_ti = tops_ti[0]
                 d_ti = db.get(Disciplina, top_ti.disciplina_id)
+                resumo_ti = (
+                    top_ti.descricao_objetiva
+                    if top_ti.descricao_objetiva
+                    else "Trilha ANPD em ritmo leve • Dados & TI para Cebraspe."
+                )
                 db.add(
                     TarefaCronograma(
                         data_programada=hoje,
@@ -703,7 +733,7 @@ def gerar_ou_obter_meu_dia(
                         duracao_planejada_minutos=30,
                         questoes_planejadas=5,
                         status_tarefa="PENDENTE",
-                        motivo_recomendacao="Trilha ANPD em ritmo leve • Dados & TI para Cebraspe.",
+                        motivo_recomendacao=resumo_ti,
                     )
                 )
                 ordem_seq += 1
