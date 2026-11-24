@@ -299,54 +299,68 @@ html, body {
   margin-bottom: 4px;
 }
 
-/* Página inicial: uma direção por vez. */
+/* Página inicial: uma direção por vez, minimalista. */
 .hero-today .eyebrow {
   color: #f7cbd8;
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.1px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
-.hero-today .hero-pills,
-.phase-toolbar,
-#form-etapa-4,
-.clean-accordion {
-  display: none;
+.roadmap-strip {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.roadmap-dot {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.14);
+  color: #f8dce5;
+}
+
+.roadmap-dot.atual {
+  background: #fceef2;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.roadmap-dot.feito {
+  background: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
+.phase-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .goal-card {
-  min-height: 112px;
+  min-height: 92px;
   padding: 18px 22px;
 }
 
 .goal-kicker {
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 
 .goal-title {
-  font-size: 17px;
+  font-size: 16.5px;
 }
 
 .goal-meta {
-  display: none;
-}
-
-.goals-stack::before {
-  content: "Metas de hoje";
-  color: var(--color-primary);
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 700;
-  margin: 4px 0 2px;
-}
-
-.goals-stack::after {
-  content: "AFO, Administração Pública e legislação de Pernambuco entram na segunda metade do ciclo SEFAZ-PE.";
+  font-size: 12.5px;
   color: var(--text-muted);
-  font-size: 12px;
-  margin-top: 2px;
 }
 
 .hero-today p {

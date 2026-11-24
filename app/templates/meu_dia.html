@@ -1,17 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- HERO LIMPO E VISUAL: VOCÊ SABE EXATAMENTE ONDE ESTÁ E O QUE FAZER HOJE -->
+<!-- HERO MINIMALISTA MID-CENTURY: FOCO VISUAL IMEDIATO -->
 <section class="hero-today">
   <div>
-    <p class="eyebrow">{{ meu_dia.data_referencia.strftime('%d/%m/%Y') }}</p>
-    <h2>Hoje, construa a sua base.</h2>
-    <p>Português todos os dias. Depois, uma matéria essencial por vez.</p>
-    <div class="hero-pills">
-      <span class="hero-pill">Meta SEFAZ-PE (2 meses): Dia {{ meu_dia.trilha_60d.dia_atual }} de {{ meu_dia.trilha_60d.prazo_dias }}</span>
-      <span class="hero-pill">Português Todo Dia + Base Sólida</span>
-      <span class="hero-pill">ANPD em ritmo leve (Dados &amp; TI)</span>
+    <p class="eyebrow">
+      {{ meu_dia.data_referencia.strftime('%d/%m/%Y') }}
+      {% if meu_dia.trilha_60d.semana %}
+        &bull; Semana {{ meu_dia.trilha_60d.semana }} de 8 (Meta 60 dias SEFAZ-PE)
+      {% endif %}
+    </p>
+    <h2>{{ meu_dia.trilha_60d.fase_titulo }}</h2>
+    <p>Português todos os dias + uma matéria essencial por vez. ANPD em ritmo leve (Dados &amp; TI).</p>
+
+    {% if meu_dia.trilha_60d.roadmap %}
+    <div class="roadmap-strip" title="Plano de 8 semanas para fechar o edital SEFAZ-PE">
+      {% for r in meu_dia.trilha_60d.roadmap %}
+      <span class="roadmap-dot {{ r.estado }}" title="Semana {{ r.semana }}: {{ r.titulo }}">
+        S{{ r.semana }}{% if r.estado == 'atual' %} &bull; {{ r.titulo }}{% endif %}
+      </span>
+      {% endfor %}
     </div>
+    {% endif %}
   </div>
 
   <div class="hero-progress-ring">
@@ -20,38 +30,37 @@
   </div>
 </section>
 
-<!-- BARRA DISCRETA DE FASE (PERMITE MIGRAR QUANDO A BASE ESTIVER FIRME) -->
+<!-- BARRA DISCRETA DE STATUS E SELETOR DE FASE -->
 <div class="phase-toolbar">
   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
     {% if not meu_dia.etapa_1_revisoes %}
       <span class="badge badge-success">&#10003; Revisões em dia</span>
     {% else %}
-      <span class="badge badge-warning">{{ meu_dia.etapa_1_revisoes|length }} revisão(ões) prioritária(s) hoje</span>
+      <span class="badge badge-warning">{{ meu_dia.etapa_1_revisoes|length }} revisão(ões) hoje</span>
     {% endif %}
-    <span class="badge badge-neutral">Tempo planejado hoje: {{ meu_dia.total_minutos_planejados }} min</span>
+    <span class="badge badge-neutral">{{ meu_dia.total_minutos_planejados }} min planejados</span>
   </div>
 
   <form method="post" action="/meu-dia/fase" style="display: inline-flex; align-items: center; gap: 8px;">
-    <select name="nova_fase" style="width: auto; padding: 6px 12px; border-radius: 999px; font-size: 12.5px;">
-      <option value="FASE_1_BASE_SOLIDA" {% if meu_dia.trilha_60d.fase_codigo == 'FASE_1_BASE_SOLIDA' %}selected{% endif %}>Fase 1: Base Sólida (Port. + RLM, Const., Adm.)</option>
-      <option value="FASE_2_FECHAMENTO_SEFAZ" {% if meu_dia.trilha_60d.fase_codigo == 'FASE_2_FECHAMENTO_SEFAZ' %}selected{% endif %}>Fase 2: Fechar SEFAZ-PE (AFO, Adm. Púb., Leis PE)</option>
-      <option value="FASE_3_ACELERACAO_ANPD" {% if meu_dia.trilha_60d.fase_codigo == 'FASE_3_ACELERACAO_ANPD' %}selected{% endif %}>Fase 3: Acelerar ANPD (Dados &amp; TI + Cebraspe)</option>
+    <select name="nova_fase" style="width: auto; padding: 6px 14px; border-radius: 999px; font-size: 12.5px;">
+      <option value="AUTO" {% if meu_dia.trilha_60d.modo == 'AUTO' %}selected{% endif %}>Automático (8 semanas SEFAZ-PE)</option>
+      <option value="FASE_1_BASE_SOLIDA" {% if meu_dia.trilha_60d.modo == 'FASE_1_BASE_SOLIDA' %}selected{% endif %}>Fixar: Base Sólida (Port. + RLM, Const., Adm.)</option>
+      <option value="FASE_2_FECHAMENTO_SEFAZ" {% if meu_dia.trilha_60d.modo == 'FASE_2_FECHAMENTO_SEFAZ' %}selected{% endif %}>Fixar: Fechar SEFAZ-PE (AFO, Adm. Púb., Leis PE)</option>
+      <option value="FASE_3_ACELERACAO_ANPD" {% if meu_dia.trilha_60d.modo == 'FASE_3_ACELERACAO_ANPD' %}selected{% endif %}>Fixar: Acelerar ANPD (Dados &amp; TI + Cebraspe)</option>
     </select>
-    <button type="submit" class="btn btn-sm btn-secondary">Aplicar Fase</button>
+    <button type="submit" class="btn btn-sm btn-secondary">Aplicar</button>
   </form>
 </div>
 
-<!-- =========================================================================
-     CHECKLIST VISUAL DO DIA — LIMPO, DIRETO E SEM EXCESSO DE INFORMAÇÃO
-     ========================================================================= -->
+<!-- CHECKLIST VISUAL DO DIA -->
 <div class="goals-stack">
 
-  <!-- ETAPA 1: REVISÕES (SÓ EXIBE CARTÕES SE HOUVER REVISÃO HOJE) -->
+  <!-- ETAPA 1: REVISÕES -->
   {% for t1 in meu_dia.etapa_1_revisoes %}
   <div class="goal-card highlight-rev {% if t1.status_tarefa == 'CONCLUIDA' %}done{% endif %}">
     <div class="goal-main">
       <div class="goal-kicker">
-        <span class="badge badge-warning">ETAPA 1 &bull; REVISÃO PRIORITÁRIA</span>
+        <span class="badge badge-warning">{{ t1.nome_etapa }}</span>
         <span class="badge badge-neutral">{{ t1.duracao_planejada_minutos }} min</span>
       </div>
       <div class="goal-title">{{ t1.titulo_tarefa }}</div>
@@ -65,21 +74,21 @@
           <input type="hidden" name="duracao_minutos" value="{{ t1.duracao_planejada_minutos }}">
           <input type="hidden" name="dificuldade" value="3">
           <input type="hidden" name="confianca" value="ALTA">
-          <button type="submit" class="btn btn-primary">Concluir Revisão &#10003;</button>
+          <button type="submit" class="btn btn-primary">Concluir &#10003;</button>
         </form>
       {% endif %}
     </div>
   </div>
   {% endfor %}
 
-  <!-- ETAPA 2: PORTUGUÊS TODO DIA + MATÉRIA DA BASE + DOSE LEVE ANPD (DADOS & TI) -->
+  <!-- ETAPA 2: PORTUGUÊS TODO DIA + MATÉRIA DO DIA + ANPD RITMO LEVE -->
   {% for t2 in meu_dia.etapa_2_conteudos_novos %}
-  {% set card_class = 'highlight-port' if 'PORTUGUÊS' in t2.nome_etapa else ('highlight-anpd' if 'ANPD' in t2.nome_etapa else 'highlight-base') %}
+  {% set card_class = 'highlight-port' if 'Português' in t2.nome_etapa else ('highlight-anpd' if 'ANPD' in t2.nome_etapa else 'highlight-base') %}
   <div class="goal-card {{ card_class }} {% if t2.status_tarefa == 'CONCLUIDA' %}done{% endif %}">
     <div class="goal-main">
       <div class="goal-kicker">
         <span class="badge {% if 'ANPD' in t2.nome_etapa %}badge-anpd{% else %}badge-sefaz{% endif %}">
-          ETAPA 2 &bull; {{ t2.nome_etapa }}
+          {{ t2.nome_etapa }}
         </span>
         <span class="badge badge-neutral">{{ t2.duracao_planejada_minutos }} min</span>
         {% if t2.questoes_planejadas > 0 %}
@@ -91,7 +100,7 @@
     </div>
     <div class="goal-actions">
       {% if t2.status_tarefa == 'CONCLUIDA' %}
-        <span class="badge badge-success">&#10003; Concluída + D1 agendada</span>
+        <span class="badge badge-success">&#10003; Feita + D1</span>
       {% else %}
         <form method="post" action="/meu-dia/concluir-rapido/{{ t2.id }}">
           <button type="submit" class="btn btn-primary">Concluir &#10003;</button>
@@ -101,19 +110,19 @@
   </div>
   {% endfor %}
 
-  <!-- ETAPA 3: PÍLULA DIÁRIA DE SÚMULA / JURISPRUDÊNCIA (EXPANSÍVEL PARA NÃO POLUIR) -->
+  <!-- ETAPA 3: PÍLULA DIÁRIA DE SÚMULA / JURISPRUDÊNCIA (10 MIN) -->
   {% for t3 in meu_dia.etapa_3_jurisprudencia %}
   {% set j = meu_dia.juris_detalhes.get(t3.id) %}
-  <details class="clean-accordion" {% if t3.status_tarefa != 'CONCLUIDA' %}open{% endif %}>
+  <details class="clean-accordion">
     <summary>
       <span>
-        <span class="badge badge-anpd" style="margin-right: 8px;">ETAPA 3 &bull; 10 MIN</span>
+        <span class="badge badge-anpd" style="margin-right: 8px;">10 min &bull; Súmula do dia</span>
         {{ t3.titulo_tarefa }}
       </span>
       {% if t3.status_tarefa == 'CONCLUIDA' %}
-        <span class="badge badge-success">&#10003; Lida hoje</span>
+        <span class="badge badge-success">&#10003; Lida</span>
       {% else %}
-        <span class="badge badge-neutral">Clique para ler</span>
+        <span class="badge badge-neutral">Ler</span>
       {% endif %}
     </summary>
     {% if j %}
@@ -129,8 +138,8 @@
     <form method="post" action="/jurisprudencia/{{ j.id }}/revisar-sm2" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
       <input type="hidden" name="redirect_to" value="/meu-dia">
       <input type="hidden" name="dificuldade" value="3">
-      <input type="text" name="compreensao" placeholder="Anotação rápida do que você fixou (opcional)..." style="flex: 1; min-width: 220px;">
-      <button type="submit" name="qualidade_sm2" value="4" class="btn btn-primary">Entendi &amp; Agendar SM-2 &#10003;</button>
+      <input type="text" name="compreensao" placeholder="Anotação rápida (opcional)..." style="flex: 1; min-width: 220px;">
+      <button type="submit" name="qualidade_sm2" value="4" class="btn btn-primary">Entendi &#10003;</button>
     </form>
     {% endif %}
     {% endif %}
@@ -139,11 +148,11 @@
 
 </div>
 
-<!-- ETAPA 4: REGISTRO DETALHADO RECOLHIDO (SEM POLUIR A TELA INICIAL) -->
+<!-- ETAPA 4: REGISTRO DETALHADO (DISCRETO NO RODAPÉ) -->
 <details class="clean-accordion" id="form-etapa-4">
   <summary>
-    <span>+ ETAPA 4 &bull; Registrar sessão detalhada (questões, acertos, tempo e anotações)</span>
-    <span class="badge badge-neutral">{{ meu_dia.etapa_4_sessoes_registradas|length }} registrada(s) hoje</span>
+    <span>+ Registrar sessão detalhada (questões, acertos e anotações)</span>
+    <span class="badge badge-neutral">{{ meu_dia.etapa_4_sessoes_registradas|length }} hoje</span>
   </summary>
 
   <form method="post" action="/meu-dia/registrar-aprendizado">
@@ -190,13 +199,13 @@
       </div>
       <div class="form-group">
         <label>Observação</label>
-        <input type="text" name="observacoes" placeholder="Resumo rápido ou link Qconcursos...">
+        <input type="text" name="observacoes" placeholder="Resumo ou link Qconcursos...">
       </div>
     </div>
     <input type="hidden" name="tipo_sessao" value="CONTEUDO_NOVO">
     <input type="hidden" name="dificuldade_percebida" value="3">
     <input type="hidden" name="grau_compreensao" value="BOM">
-    <button type="submit" class="btn btn-primary">Salvar Sessão e Agendar Revisão D1</button>
+    <button type="submit" class="btn btn-primary">Salvar Sessão e Agendar D1</button>
   </form>
 </details>
 

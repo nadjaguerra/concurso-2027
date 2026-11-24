@@ -376,58 +376,102 @@ def _atualizar_dominio_topico_baseado_em_evidencias(
         topico.situacao_dominio = "EM_DESENVOLVIMENTO"
 
 
-def obter_contexto_trilha_60d(db: Session, hoje: Optional[date] = None) -> dict[str, Any]:
-    """Retorna a fase pedagógica atual e o progresso no prazo de 60 dias (2 meses) da SEFAZ-PE."""
-    ref = hoje or date.today()
-    cfg_inicio = db.scalar(
-        select(Configuracao).where(Configuracao.chave == "inicio_ciclo_sefaz_60d")
-    )
-    cfg_prazo = db.scalar(
-        select(Configuracao).where(Configuracao.chave == "prazo_dias_sefaz")
-    )
-    cfg_inicio_anpd = db.scalar(
-        select(Configuracao).where(Configuracao.chave == "inicio_ciclo_anpd_120d")
-    )
-    cfg_prazo_anpd = db.scalar(
-        select(Configuracao).where(Configuracao.chave == "prazo_dias_anpd")
-    )
+TRILHA_SEMANAS: list[tuple[int, str, list[str]]] = [
+    (1, "Constitucional + Raciocínio Lógico", ["DIR_CONST", "RLM"]),
+    (2, "Constitucional + Raciocínio Lógico", ["DIR_CONST", "RLM"]),
+    (3, "Direito Administrativo + Adm. Geral e Pública", ["DIR_ADM", "ADM_PUB"]),
+    (4, "Direito Administrativo + Adm. Geral e Pública", ["DIR_ADM", "ADM_PUB"]),
+    (5, "Administração Geral e Pública (20 questões)", ["ADM_PUB", "GEST_PESS_MAT"]),
+    (6, "Administração Pública + Orçamento Público", ["ADM_PUB", "AFO"]),
+    (7, "Educação Fiscal, Informática e Leis de PE", ["EDU_FISCAL", "INFO_BASICA", "LEG_PE"]),
+    (8, "Revisão geral e simulados", ["DIR_CONST", "DIR_ADM", "ADM_PUB", "RLM"]),
+]
 
+FASES_MANUAIS: dict[str, tuple[str, list[str]]] = {
+    "FASE_1_BASE_SOLIDA": ("Base sólida", ["DIR_CONST", "DIR_ADM", "RLM"]),
+    "FASE_2_FECHAMENTO_SEFAZ": (
+        "Fechar SEFAZ-PE",
+        ["ADM_PUB", "AFO", "LEG_PE", "GEST_PESS_MAT", "EDU_FISCAL", "INFO_BASICA"],
+    ),
+    "FASE_3_ACELERACAO_ANPD": (
+        "Acelerar ANPD (Dados & TI)",
+        ["LGPD_ANPD", "TI_CD_EST", "TI_ENG_DADOS", "TI_IA"],
+    ),
+}
+
+# Distribuição oficial de questões — Edital SEFAZ-PE nº 001/2022, item 5.2.1
+PESO_PROVA_SEFAZ_2022: list[tuple[str, int]] = [
+    ("Administração Geral e Pública", 20),
+    ("Língua Portuguesa", 10),
+    ("Raciocínio Lógico-Matemático", 5),
+    ("Informática", 5),
+    ("Direito Administrativo", 5),
+    ("Direito Constitucional", 5),
+    ("Orçamento Público", 5),
+    ("Educação Fiscal", 5),
+]
+
+
+def obter_contexto_trilha_60d(db: Session, hoje: Optional[date] = None) -> dict[str, Any]:
+    """Plano de 8 semanas (60 dias) para fechar o edital da SEFAZ-PE, calculado pela data."""
+    ref = hoje or date.today()
+
+    def _cfg(chave: str):
+        return db.scalar(select(Configuracao).where(Configuracao.chave == chave))
+
+    cfg_modo = _cfg("modo_trilha")
+    cfg_inicio = _cfg("inicio_ciclo_sefaz_60d")
+    cfg_prazo = _cfg("prazo_dias_sefaz")
+    cfg_inicio_anpd = _cfg("inicio_ciclo_anpd_120d")
+    cfg_prazo_anpd = _cfg("prazo_dias_anpd")
+
+    modo = json.loads(cfg_modo.valor_json) if cfg_modo else "AUTO"
     try:
-        inicio = (
-            date.fromisoformat(json.loads(cfg_inicio.valor_json))
-            if cfg_inicio
-            else ref
-        )
+        inicio = date.fromisoformat(json.loads(cfg_inicio.valor_json)) if cfg_inicio else ref
     except Exception:
         inicio = ref
     prazo = int(json.loads(cfg_prazo.valor_json)) if cfg_prazo else 60
     try:
-        inicio_anpd = (
-            date.fromisoformat(json.loads(cfg_inicio_anpd.valor_json))
-            if cfg_inicio_anpd
-            else inicio
-        )
+        inicio_anpd = date.fromisoformat(json.loads(cfg_inicio_anpd.valor_json)) if cfg_inicio_anpd else inicio
     except Exception:
         inicio_anpd = inicio
     prazo_anpd = int(json.loads(cfg_prazo_anpd.valor_json)) if cfg_prazo_anpd else 120
+
     dia_atual = max(1, (ref - inicio).days + 1)
     dia_anpd = max(1, (ref - inicio_anpd).days + 1)
-    dias_restantes = max(0, prazo - dia_atual)
-    perc_tempo = min(100, int(round(dia_atual / max(1, prazo) * 100)))
 
-    fase = "FASE_1_BASE_SOLIDA" if dia_atual <= 28 else "FASE_2_FECHAMENTO_SEFAZ"
-    titulos_fase = {
-        "FASE_1_BASE_SOLIDA": "Fase 1 — Base Sólida (Português diário + RLM, Const. e Adm.)",
-        "FASE_2_FECHAMENTO_SEFAZ": "Fase 2 — Fechamento SEFAZ-PE (Português + AFO, Adm. Pública e Leis PE)",
-        "FASE_3_ACELERACAO_ANPD": "Fase 3 — Aceleração ANPD (Dados & TI / Cebraspe) + Manutenção SEFAZ-PE",
-    }
+    semana: Optional[int] = None
+    if modo in FASES_MANUAIS:
+        fase = modo
+        foco, codigos = FASES_MANUAIS[modo]
+    elif dia_atual > prazo:
+        fase = "FASE_3_ACELERACAO_ANPD"
+        foco, codigos = FASES_MANUAIS[fase]
+    else:
+        semana = min(8, (dia_atual - 1) // 7 + 1)
+        _, foco, codigos = TRILHA_SEMANAS[semana - 1]
+        fase = "FASE_1_BASE_SOLIDA" if semana <= 4 else "FASE_2_FECHAMENTO_SEFAZ"
+
+    roadmap = []
+    for num, titulo, _ in TRILHA_SEMANAS:
+        if semana is not None:
+            estado = "atual" if num == semana else ("feito" if num < semana else "futuro")
+        else:
+            estado = "feito" if dia_atual > prazo else "futuro"
+        roadmap.append({"semana": num, "titulo": titulo, "estado": estado})
+
     return {
+        "modo": modo,
         "fase_codigo": fase,
-        "fase_titulo": titulos_fase.get(fase, titulos_fase["FASE_1_BASE_SOLIDA"]),
+        "fase_titulo": foco,
+        "semana": semana,
+        "foco_semana": foco,
+        "codigos_materia": codigos,
+        "roadmap": roadmap,
         "dia_atual": dia_atual,
         "prazo_dias": prazo,
-        "dias_restantes": dias_restantes,
-        "perc_tempo": perc_tempo,
+        "dias_restantes": max(0, prazo - dia_atual),
+        "perc_tempo": min(100, int(round(dia_atual / max(1, prazo) * 100))),
         "anpd_hoje": ref.weekday() in (1, 3, 5),
         "anpd_dia_atual": dia_anpd,
         "anpd_prazo_dias": prazo_anpd,
@@ -435,26 +479,19 @@ def obter_contexto_trilha_60d(db: Session, hoje: Optional[date] = None) -> dict[
 
 
 def alterar_fase_estudo(db: Session, nova_fase: str) -> None:
-    """Mantém compatibilidade com a rota legada e reorganiza as metas pendentes."""
-    permitidas = {
-        "FASE_1_BASE_SOLIDA",
-        "FASE_2_FECHAMENTO_SEFAZ",
-        "FASE_3_ACELERACAO_ANPD",
-    }
-    if nova_fase not in permitidas:
+    """Fixa uma fase manualmente (ou volta para AUTO) e reorganiza as metas pendentes de hoje."""
+    if nova_fase != "AUTO" and nova_fase not in FASES_MANUAIS:
         return
-    cfg = db.scalar(
-        select(Configuracao).where(Configuracao.chave == "fase_estudo_atual")
-    )
+    cfg = db.scalar(select(Configuracao).where(Configuracao.chave == "modo_trilha"))
     if cfg:
         cfg.valor_json = json.dumps(nova_fase)
     else:
         db.add(
             Configuracao(
-                chave="fase_estudo_atual",
+                chave="modo_trilha",
                 valor_json=json.dumps(nova_fase),
                 categoria="ESTRATEGIA",
-                descricao="Fase pedagógica atual do plano de 60 dias",
+                descricao="AUTO ou fase fixa",
             )
         )
     db.commit()
@@ -532,7 +569,7 @@ def gerar_ou_obter_meu_dia(
                 TarefaCronograma(
                     data_programada=hoje,
                     etapa_meu_dia=1,
-                    nome_etapa="ETAPA 1 — REVISÕES",
+                    nome_etapa="Revisão",
                     ordem_no_dia=ordem_seq,
                     eixo_estrategico=eixo_rev,
                     disciplina_id=disc.id,
@@ -565,7 +602,7 @@ def gerar_ou_obter_meu_dia(
                     TarefaCronograma(
                         data_programada=hoje,
                         etapa_meu_dia=2,
-                        nome_etapa="PORTUGUÊS TODO DIA",
+                        nome_etapa="Português · todo dia",
                         ordem_no_dia=ordem_seq,
                         eixo_estrategico="EIXO_1_SEFAZ_PE",
                         disciplina_id=disc_port.id,
@@ -579,32 +616,33 @@ def gerar_ou_obter_meu_dia(
                 )
                 ordem_seq += 1
 
-        # 2B. MATÉRIA PRINCIPAL DO DIA CONFORME A FASE PEDAGÓGICA
+        # 2B. MATÉRIA DO DIA = foco da semana do plano de 60 dias
         fase_atual = trilha["fase_codigo"]
-        if fase_atual == "FASE_1_BASE_SOLIDA":
-            codigos_fase = ["DIR_CONST", "DIR_ADM", "RLM"]
-            etiqueta_fase = "Base Sólida • Foco Cebraspe & SEFAZ-PE"
-        elif fase_atual == "FASE_2_FECHAMENTO_SEFAZ":
-            codigos_fase = ["ADM_PUB", "AFO", "LEG_PE", "GEST_PESS_MAT"]
-            etiqueta_fase = "Fechamento SEFAZ-PE (Meta 60 dias)"
+        codigos_fase = trilha["codigos_materia"]
+        if trilha["semana"]:
+            etiqueta_fase = f"Semana {trilha['semana']} de 8 · {trilha['foco_semana']}"
         else:
-            codigos_fase = ["LGPD_ANPD", "TI_CD_EST", "TI_ENG_DADOS", "TI_IA"]
-            etiqueta_fase = "Aceleração ANPD + Dados & TI (Cebraspe)"
+            etiqueta_fase = trilha["foco_semana"]
 
-        ids_fase = [
-            disc_by_cod[c].id for c in codigos_fase if c in disc_by_cod
-        ]
-        candidatos_fase = db.scalars(
-            select(Topico)
-            .where(
-                Topico.disciplina_id.in_(ids_fase),
-                Topico.status_estudo != "DOMINADO",
+        ids_fase = [disc_by_cod[c].id for c in codigos_fase if c in disc_by_cod]
+        candidatos_fase = list(
+            db.scalars(
+                select(Topico).where(
+                    Topico.disciplina_id.in_(ids_fase),
+                    Topico.status_estudo != "DOMINADO",
+                )
+            ).all()
+        )
+        # Primeiro o que ainda não foi estudado; depois o que mais pesa
+        candidatos_fase.sort(
+            key=lambda t: (
+                0 if t.status_estudo in ("NAO_INICIADO", "MATERIAL_LOCALIZADO") else 1,
+                -t.score_importancia,
+                t.codigo_estavel,
             )
-            .order_by(Topico.score_importancia.desc(), Topico.codigo_estavel.asc())
-        ).all()
+        )
 
         if candidatos_fase:
-            # Rotaciona entre as disciplinas da fase para variedade limpa sem pular para AFO na Fase 1
             cod_disc_dia = codigos_fase[hoje.toordinal() % len(codigos_fase)]
             did_pref = disc_by_cod[cod_disc_dia].id if cod_disc_dia in disc_by_cod else None
             top_base = next(
@@ -623,7 +661,7 @@ def gerar_ou_obter_meu_dia(
                 TarefaCronograma(
                     data_programada=hoje,
                     etapa_meu_dia=2,
-                    nome_etapa="MATÉRIA PRINCIPAL",
+                    nome_etapa="Matéria do dia",
                     ordem_no_dia=ordem_seq,
                     eixo_estrategico=eixo_base,
                     disciplina_id=top_base.disciplina_id,
@@ -656,7 +694,7 @@ def gerar_ou_obter_meu_dia(
                     TarefaCronograma(
                         data_programada=hoje,
                         etapa_meu_dia=2,
-                        nome_etapa="ANPD TRANQUILO • DADOS & TI",
+                        nome_etapa="ANPD · Dados & TI · ritmo leve",
                         ordem_no_dia=ordem_seq,
                         eixo_estrategico="EIXO_2_ANPD_TI",
                         disciplina_id=top_ti.disciplina_id,

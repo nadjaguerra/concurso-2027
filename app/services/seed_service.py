@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, timedelta
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.config import (
@@ -42,6 +42,49 @@ from app.models.entities import (
     Topico,
 )
 from app.services.acervo_service import indexar_acervo_completo
+
+
+def aplicar_correcoes_integridade(db: Session) -> None:
+    """Corrige dados de versões anteriores que não estavam verificados em fonte (idempotente)."""
+    # 1) Questões escritas pela plataforma nunca podem aparecer como oficiais
+    for q in db.scalars(select(Questao).where(Questao.natureza_questao == "OFICIAL_ACERVO")).all():
+        q.natureza_questao = "QUESTAO_TREINO_PLATAFORMA"
+        q.concurso_referencia = f"Treino no estilo {q.banca_nome}"
+        q.ano = None
+        q.fonte_origem = "Item de treino elaborado pela plataforma (não é questão oficial). Base: " + (q.fonte_origem or "")
+    # 2) Normas: o arquivo está no acervo, mas a vigência ainda não foi conferida na fonte
+    for n in db.scalars(select(NormaJuridica).where(NormaJuridica.status_vigencia == "VIGENTE_VERIFICADA_EM_FONTE")).all():
+        if n.versao_controle and "Verificado" in n.versao_controle:
+            n.status_vigencia = "TEXTO_NO_ACERVO_VIGENCIA_A_CONFERIR"
+            n.versao_controle = "Texto do acervo (baixado em 22/11/2026)"
+            n.data_atualizacao_verificada = None
+            n.historico_alteracoes_legislativas = "Vigência e alterações ainda não conferidas na fonte oficial."
+    # 3) Jurisprudência: textos de referência, a conferir no site oficial
+    for j in db.scalars(select(EntendimentoJurisprudencia)).all():
+        if j.situacao_vigencia == "VIGENTE_VERIFICADA":
+            j.situacao_vigencia = "CONFERIR_NA_FONTE_OFICIAL"
+            j.data_atualizacao_verificada = None
+        if j.numero_identificacao.startswith("Tema Repetitivo 1177"):
+            j.numero_identificacao = "Precedente do STJ sobre vazamento de dados comuns (identificação a confirmar)"
+            j.situacao_vigencia = "PENDENTE_VERIFICACAO_FONTE"
+            j.data_publicacao = None
+            j.link_origem = None
+            j.fonte_oficial = "A confirmar no portal do STJ (não confirmado como tema repetitivo)"
+        if j.numero_identificacao.startswith("Acórdão TCU Plenário"):
+            j.numero_identificacao = "Auditoria LGPD — TC 039.606/2020 (relatório no acervo)"
+            j.data_publicacao = None
+    # 4) Projetos (PMBOK/Scrum) não constam no edital da SEFAZ-PE
+    t = db.scalar(select(Topico).where(Topico.codigo_estavel == "ADM_PUB_02"))
+    if t:
+        for a in db.scalars(select(AssociacaoTopicoConcurso).where(AssociacaoTopicoConcurso.topico_id == t.id)).all():
+            c = db.get(Concurso, a.concurso_id)
+            if c and c.codigo == "SEFAZ_PE_APOIO":
+                a.status_no_concurso = "COMPLEMENTAR"
+    # 5) Config antiga
+    old = db.scalar(select(Configuracao).where(Configuracao.chave == "fase_estudo_atual"))
+    if old:
+        db.delete(old)
+    db.commit()
 
 
 def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
@@ -115,10 +158,10 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
             "Prazo alvo de quatro meses para a trilha ANPD",
         ),
         (
-            "fase_estudo_atual",
-            json.dumps("FASE_1_BASE_SOLIDA"),
+            "modo_trilha",
+            json.dumps("AUTO"),
             "ESTRATEGIA",
-            "Fase pedagógica atual: FASE_1_BASE_SOLIDA (Português + RLM + Const. + Adm.), FASE_2_FECHAMENTO_SEFAZ ou FASE_3_ACELERACAO_ANPD",
+            "AUTO = plano de 8 semanas por data; ou fixe uma fase manualmente",
         ),
         (
             "portugues_todo_dia",
@@ -213,7 +256,7 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
                 "EDITAL_ABERTURA",
                 "HISTORICO_REFERENCIA",
                 date(2022, 4, 5),
-                "Prova Objetiva de 80 questões (Conhecimentos Gerais: Português, RLM, Informática; Conhecimentos Específicos: Administração Pública, Direito Administrativo, Direito Constitucional, AFO, Gestão de Pessoas e Materiais).",
+                "Prova objetiva de 60 questões (2,5 pts cada): Português 10, RLM 5, Informática 5, Dir. Administrativo 5, Dir. Constitucional 5, Orçamento Público 5, Educação Fiscal 5, Administração Geral e Pública 20. Corte: 50% em Gerais e 50% em Específicas (item 6.4).",
             ),
         },
         {
@@ -580,6 +623,30 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
             13,
             "Frente Tecnológica (20% interno) + Informática SEFAZ-PE: Segurança da Informação (ISO 27001/27701, criptografia, gestão de incidentes CERT.br/ANPD), redes, sistemas operacionais e engenharia de software.",
         ),
+        (
+            "EDU_FISCAL",
+            "Educação Fiscal",
+            "Fazendária",
+            "EIXO_1_SEFAZ_PE",
+            False,
+            None,
+            None,
+            False,
+            14,
+            "Tributo, Sistema Tributário Nacional, federalismo fiscal, PNEF e cidadania fiscal (edital SEFAZ-PE 2022: 5 questões).",
+        ),
+        (
+            "INFO_BASICA",
+            "Informática (Windows, Office, Internet e Segurança)",
+            "Básica Comum",
+            "EIXO_1_SEFAZ_PE",
+            False,
+            None,
+            None,
+            False,
+            15,
+            "Internet/intranet, Windows, Microsoft Office, redes, vírus, backup e nuvem (edital SEFAZ-PE 2022: 5 questões).",
+        ),
     ]
 
     disc_map: dict[str, Disciplina] = {}
@@ -904,6 +971,50 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
             [
                 (sefaz.id, "HISTORICO_REFERENCIA", "Conhecimentos Específicos — Gestão de Pessoas e Materiais", 1.4),
             ],
+        ),
+        (
+            "ADM_PUB_03",
+            "ADM_PUB",
+            "Conceitos básicos e funções administrativas: planejar, organizar, dirigir e controlar",
+            "Eficiência, eficácia e efetividade; níveis hierárquicos; processo administrativo (Anexo III do edital SEFAZ-PE).",
+            False,
+            60,
+            9.4,
+            "Edital SEFAZ-PE 001/2022 — Anexo III (Administração Geral e Pública)",
+            [(sefaz.id, "HISTORICO_REFERENCIA", "Adm. Geral e Pública — 20 questões", 1.8)],
+        ),
+        (
+            "ADM_PUB_05",
+            "ADM_PUB",
+            "Políticas públicas (ciclo), indicadores, gestão por resultados e qualidade",
+            "Ciclo das políticas públicas, indicadores de desempenho, governança, gestão da qualidade e excelência na administração pública.",
+            False,
+            60,
+            9.2,
+            "Edital SEFAZ-PE 001/2022 — Anexo III (Administração Geral e Pública)",
+            [(sefaz.id, "HISTORICO_REFERENCIA", "Adm. Geral e Pública — 20 questões", 1.7)],
+        ),
+        (
+            "EDU_FISCAL_01",
+            "EDU_FISCAL",
+            "Tributos, Sistema Tributário Nacional, federalismo fiscal e Educação Fiscal (PNEF)",
+            "Conceito e classificação de tributos, impostos da União/Estados, repartição de receitas, crimes contra a ordem tributária, PNEF e cidadania fiscal.",
+            False,
+            60,
+            8.0,
+            "Edital SEFAZ-PE 001/2022 — Anexo III + PNEF (02_SEFAZ_PE)",
+            [(sefaz.id, "HISTORICO_REFERENCIA", "Educação Fiscal — 5 questões", 1.4)],
+        ),
+        (
+            "INFO_01",
+            "INFO_BASICA",
+            "Informática: internet, Windows, Office, redes, segurança e backup",
+            "Navegação e e-mail, Windows, Word/Excel/PowerPoint, redes, vírus, backup e armazenamento em nuvem.",
+            False,
+            50,
+            7.5,
+            "Edital SEFAZ-PE 001/2022 — Anexo III (Informática)",
+            [(sefaz.id, "HISTORICO_REFERENCIA", "Informática — 5 questões", 1.3)],
         ),
         # EIXO 2 — ANPD + DADOS E TI (40% Global, com 30/25/25/20 interno na Frente Tecnológica)
         (
@@ -1290,8 +1401,8 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
             "15.815",
             "2016",
             "Lei do FASAF — Fundo de Aperfeiçoamento dos Serviços Administrativos Fazendários (SEFAZ-PE)",
-            "Consolida as normas relativas ao FASAF no âmbito da Secretaria da Fazenda de Pernambuco.",
-            "Destinação do fundo, participação dos Analistas e Assistentes de Apoio Administrativo às Atividades Fazendárias",
+            "Consolida e altera o Fundo de Aperfeiçoamento dos Serviços Administrativos Fazendários - FASAF, e dá outras providências.",
+            "Art. 2º (até 56% do FAAF), art. 2º §1º (gestão pela SAFI) e art. 3º (distribuição mensal aos servidores do GOAAF)",
             "ALEPE Legis",
             "https://legis.alepe.pe.gov.br/texto.aspx?tiponorma=1&numero=15815&complemento=0&ano=2016",
             "LEG_PE",
@@ -1364,175 +1475,48 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
                     )
     db.commit()
 
-    # 8. Inteligência de Cobrança e Histórico de Provas Reais do Acervo (Seção 10)
-    if (
-        db.scalar(select(func.count(HistoricoProvaCobranca.id))) == 0
-    ):
-        cobrancas_seed = [
-            (
-                bancas_map["IAUPE/UPENET"].id,
-                "IAUPE/UPENET",
-                "SEFAZ-PE 2022 (Edital nº 001/2022)",
-                "Analista de Apoio Administrativo às Atividades Fazendárias",
-                2022,
-                disc_map["DIR_ADM"].id,
-                topicos_map["DIR_ADM_01"].id,
-                "Licitações, Contratos, Atos, Poderes e Agentes Públicos",
-                12,
-                80,
-                15.0,
-                "MUITO_RECORRENTE",
-                "Cadernos 01 e 02 Analista de Apoio Administrativo + Gabarito Definitivo (05_PROVAS_E_GABARITOS).",
-                2,
-                "2022",
-                "analista de apoio administrativo caderno 01.pdf",
-            ),
-            (
-                bancas_map["IAUPE/UPENET"].id,
-                "IAUPE/UPENET",
-                "SEFAZ-PE 2022 (Edital nº 001/2022)",
-                "Analista de Apoio Administrativo às Atividades Fazendárias",
-                2022,
-                disc_map["AFO"].id,
-                topicos_map["AFO_03"].id,
-                "Orçamento Público (PPA/LDO/LOA), Lei 4.320/64 (Receita/Despesa) e LRF (LC 101/00)",
-                10,
-                80,
-                12.5,
-                "MUITO_RECORRENTE",
-                "Cadernos 01 e 02 Analista de Apoio Administrativo SEFAZ-PE 2022.",
-                2,
-                "2022",
-                "analista de apoio administrativo caderno 02.pdf",
-            ),
-            (
-                bancas_map["IAUPE/UPENET"].id,
-                "IAUPE/UPENET",
-                "SEFAZ-PE 2022 (Edital nº 001/2022)",
-                "Analista de Apoio Administrativo às Atividades Fazendárias",
-                2022,
-                disc_map["ADM_PUB"].id,
-                topicos_map["ADM_PUB_01"].id,
-                "Planejamento Estratégico, Governança, Gestão de Processos e Projetos",
-                10,
-                80,
-                12.5,
-                "MUITO_RECORRENTE",
-                "Cadernos 01 e 02 Analista de Apoio Administrativo SEFAZ-PE 2022.",
-                2,
-                "2022",
-                "analista de apoio administrativo caderno 01.pdf",
-            ),
-            (
-                bancas_map["Cebraspe"].id,
-                "Cebraspe",
-                "ANATEL 2024",
-                "Especialista em Regulação — Especialidade: Ciências de Dados",
-                2024,
-                disc_map["LGPD_ANPD"].id,
-                topicos_map["LGPD_01"].id,
-                "Regulação, Agências Reguladoras, LGPD, Governança e Proteção de Dados",
-                18,
-                120,
-                15.0,
-                "MUITO_RECORRENTE",
-                "Prova Objetiva e Discursiva ANATEL 2024 Especialista em Regulação - Ciências de Dados (05_PROVAS_E_GABARITOS).",
-                4,
-                "2021-2026",
-                "cespe-cebraspe-2024-anatel-especialista-em-regulacao-de-servicos-publicos-de-telecomunicacoes-especialidade-ciencias-de-dados-prova.pdf",
-            ),
-            (
-                bancas_map["Cebraspe"].id,
-                "Cebraspe",
-                "ANATEL 2024 / SERPRO 2023 / EMBRAPA 2025",
-                "Especialista em Regulação e Analista — Ciência de Dados",
-                2025,
-                disc_map["TI_CD_EST"].id,
-                topicos_map["TI_CD_01"].id,
-                "Estatística Inferencial, Testes de Hipóteses, Regressão e Análise Exploratória",
-                22,
-                120,
-                18.3,
-                "MUITO_RECORRENTE",
-                "6 provas objetivas Cebraspe de Ciência de Dados no acervo (SERPRO 2021/2023, Petrobras, ANATEL 2024, ANM 2025, EMBRAPA 2025, FUNPRESP 2025).",
-                6,
-                "2021-2025",
-                "cespe-cebraspe-2025-embrapa-analista-area-ciencias-exatas-e-da-terra-subarea-ciencia-de-dados-prova.pdf",
-            ),
-            (
-                bancas_map["Cebraspe"].id,
-                "Cebraspe",
-                "TCU 2025/2026 e SERPRO 2023",
-                "Auditor Federal de Controle Externo (TI) e Analista de Tecnologia",
-                2026,
-                disc_map["TI_ENG_DADOS"].id,
-                topicos_map["TI_ENG_01"].id,
-                "Bancos de Dados SQL, Modelagem Dimensional, ETL e Governança de Dados",
-                18,
-                120,
-                15.0,
-                "MUITO_RECORRENTE",
-                "Provas Cebraspe TCU 2026 e SERPRO 2023 no acervo local.",
-                5,
-                "2021-2026",
-                "cespe-cebraspe-2026-tcu-auditor-federal-de-controle-externo-area-de-controle-externo-orientacao-auditoria-de-tecnologia-da-informacao-prova.pdf",
-            ),
-            (
-                bancas_map["Cebraspe"].id,
-                "Cebraspe",
-                "SEPLAG/AL — UNEAL 2026 (Edital nº 1/2026)",
-                "Analista Administrativo — Área: Desenvolvimento e Inovação",
-                2026,
-                disc_map["ADM_PUB"].id,
-                topicos_map["ADM_PUB_02"].id,
-                "Gestão de Projetos (PMBOK 7ª ed., Scrum, Kanban), Planejamento SWOT/BSC e Direito Administrativo",
-                70,
-                120,
-                58.3,
-                "MUITO_RECORRENTE",
-                "Caderno Cebraspe_Adm_Publica_Doc3.pdf (itens 51 a 120) + Gabarito Doc1.pdf no acervo local.",
-                1,
-                "2026",
-                "cebraspe_adm_publica_doc3.pdf",
-            ),
+    # 8. Peso oficial das matérias no edital SEFAZ-PE 2022 (item 5.2.1) — dado verificado
+    METODO_EDITAL = "Distribuição oficial de questões do edital (item 5.2.1)"
+    db.execute(
+        delete(HistoricoProvaCobranca).where(
+            HistoricoProvaCobranca.metodo_utilizado != METODO_EDITAL
+        )
+    )
+    if db.scalar(select(func.count(HistoricoProvaCobranca.id))) == 0:
+        mat_edital = mat_by_name.get("sefaz_pe_2022_edital_001_2022.pdf")
+        pesos = [
+            ("ADM_PUB", "Administração Geral e Pública", 20),
+            ("PORT", "Língua Portuguesa", 10),
+            ("RLM", "Raciocínio Lógico-Matemático", 5),
+            ("INFO_BASICA", "Informática", 5),
+            ("DIR_ADM", "Direito Administrativo", 5),
+            ("DIR_CONST", "Direito Constitucional", 5),
+            ("AFO", "Orçamento Público", 5),
+            ("EDU_FISCAL", "Educação Fiscal", 5),
         ]
-        for (
-            bid,
-            bsigla,
-            cnome,
-            cargonome,
-            ano_p,
-            did,
-            tid,
-            assunto,
-            qtd_a,
-            tot_p,
-            freq,
-            rec,
-            evid,
-            qtd_provas,
-            periodo,
-            mat_fname,
-        ) in cobrancas_seed:
-            mat_obj = mat_by_name.get(mat_fname)
+        for cod, nome, qtd in pesos:
+            if cod not in disc_map:
+                continue
             db.add(
                 HistoricoProvaCobranca(
-                    banca_id=bid,
-                    banca_sigla=bsigla,
-                    concurso_nome=cnome,
-                    cargo_nome=cargonome,
-                    ano_prova=ano_p,
-                    disciplina_id=did,
-                    topico_id=tid,
-                    assunto_cobrado=assunto,
-                    quantidade_questoes_assunto=qtd_a,
-                    total_questoes_prova=tot_p,
-                    frequencia_percentual=freq,
-                    classificacao_recorrencia=rec,
-                    evidencias_utilizadas=evid,
-                    quantidade_provas_analisadas=qtd_provas,
-                    periodo_considerado=periodo,
-                    material_prova_id=mat_obj.id if mat_obj else None,
+                    banca_id=bancas_map["IAUPE/UPENET"].id,
+                    banca_sigla="IAUPE/UPENET",
+                    concurso_nome="SEFAZ-PE 2022 (Edital nº 001/2022)",
+                    cargo_nome="Analista de Apoio Administrativo às Atividades Fazendárias",
+                    ano_prova=2022,
+                    disciplina_id=disc_map[cod].id,
+                    assunto_cobrado=nome,
+                    quantidade_questoes_assunto=qtd,
+                    total_questoes_prova=60,
+                    frequencia_percentual=round(qtd / 60 * 100, 1),
+                    classificacao_recorrencia="PESO_OFICIAL_NO_EDITAL",
+                    evidencias_utilizadas="Edital nº 001/2022, item 5.2.1 (01_EDITAIS_E_PLANEJAMENTO).",
+                    quantidade_provas_analisadas=1,
+                    periodo_considerado="2022",
+                    metodo_utilizado=METODO_EDITAL,
+                    nivel_confianca_analise="OFICIAL (edital)",
+                    limitacoes_analise="Distribuição do edital de 2022; o próximo edital pode mudar. A contagem por assunto dentro das provas do acervo ainda não foi feita.",
+                    material_prova_id=mat_edital.id if mat_edital else None,
                 )
             )
         db.commit()
@@ -1732,8 +1716,8 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
                 topicos_map["DIR_ADM_01"].id,
             ),
             (
-                "Qual é a finalidade do FASAF instituído pela Lei Estadual de Pernambuco nº 15.815/2016 na SEFAZ-PE?",
-                "O Fundo de Aperfeiçoamento dos Serviços Administrativos Fazendários (FASAF) destina-se ao incentivo, modernização e valorização das atividades de apoio administrativo fazendário, contemplando os cargos de Analista e Assistente de Apoio Administrativo às Atividades Fazendárias.",
+                "Pela Lei Estadual PE nº 15.815/2016, quem gere o FASAF e para quem os recursos são distribuídos mensalmente?",
+                "O FASAF (Fundo de Aperfeiçoamento dos Serviços Administrativos Fazendários) é gerido pela SAFI (SEFAZ) e é integralizado por até 56% dos recursos do FAAF (arts. 2º e 3º). Os recursos são distribuídos mensalmente aos servidores do GOAAF (Grupo Ocupacional Apoio Administrativo às Atividades Fazendárias).",
                 disc_map["LEG_PE"].id,
                 topicos_map["LEG_PE_02"].id,
             ),
@@ -1764,7 +1748,7 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
     if db.scalar(select(func.count(Questao.id))) == 0:
         questoes_seed = [
             (
-                "OFICIAL_ACERVO",
+                "QUESTAO_TREINO_PLATAFORMA",
                 "ANATEL 2024 / Padrão Cebraspe",
                 bancas_map["Cebraspe"].id,
                 "Cebraspe",
@@ -1779,7 +1763,7 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
                 "Enunciado CD/ANPD nº 1/2023 e Prova Cebraspe ANATEL 2024 no acervo",
             ),
             (
-                "OFICIAL_ACERVO",
+                "QUESTAO_TREINO_PLATAFORMA",
                 "Padrão Cebraspe — Resolução CD/ANPD nº 18/2024",
                 bancas_map["Cebraspe"].id,
                 "Cebraspe",
@@ -1794,7 +1778,7 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
                 "Resolução CD/ANPD nº 18/2024 (03_ANPD/Resolucao_CD_ANPD_18_2024_Texto_Oficial_DOU.html)",
             ),
             (
-                "OFICIAL_ACERVO",
+                "QUESTAO_TREINO_PLATAFORMA",
                 "SEPLAG/AL — UNEAL 2026 (Cargo 5: Analista Administrativo)",
                 bancas_map["Cebraspe"].id,
                 "Cebraspe",
@@ -1809,7 +1793,7 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
                 "05_PROVAS_E_GABARITOS/Cebraspe_Adm_Publica_Doc3.pdf (Prova UNEAL 2026 Cebraspe)",
             ),
             (
-                "OFICIAL_ACERVO",
+                "QUESTAO_TREINO_PLATAFORMA",
                 "SEFAZ-PE 2022 — Analista de Apoio Administrativo",
                 bancas_map["IAUPE/UPENET"].id,
                 "IAUPE/UPENET",
@@ -1833,7 +1817,7 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
                 "Lei nº 4.320/1964 e Caderno Analista de Apoio Administrativo SEFAZ-PE 2022 (05_PROVAS_E_GABARITOS)",
             ),
             (
-                "OFICIAL_ACERVO",
+                "QUESTAO_TREINO_PLATAFORMA",
                 "TCU 2025/2026 — Auditoria de TI / Ciência de Dados",
                 bancas_map["Cebraspe"].id,
                 "Cebraspe",
@@ -1848,7 +1832,7 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
                 "Prova Cebraspe TCU 2026 / SERPRO 2023 em 05_PROVAS_E_GABARITOS",
             ),
             (
-                "OFICIAL_ACERVO",
+                "QUESTAO_TREINO_PLATAFORMA",
                 "SERPRO 2023 / ANATEL 2024 — Ciência de Dados",
                 bancas_map["Cebraspe"].id,
                 "Cebraspe",
@@ -1951,4 +1935,5 @@ def inicializar_dados_plataforma(db: Session) -> dict[str, int]:
             )
         db.commit()
 
+    aplicar_correcoes_integridade(db)
     return stats_acervo
