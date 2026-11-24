@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Aviso de Separação Transparente de Algoritmos (Seção 17) -->
+<div class="alert-banner info">
+  <strong>Transparência de Algoritmos de Repetição Espaçada (Regra 17):</strong>
+  1. <strong>Revisões Gerais de Tópicos da Matriz</strong> utilizam a escada adaptativa <strong>D1 &rarr; D7 &rarr; D15 &rarr; D30 &rarr; D60</strong> (ajustada por desempenho, confiança e erros).
+  2. <strong>Flashcards e Jurisprudência/Súmulas</strong> utilizam o algoritmo matemático <strong>SM-2 (SuperMemo 2)</strong> com Fator de Facilidade ($EF \ge 1.3$) e qualidade de resposta de 0 a 5.
+</div>
+
+<div class="grid-2">
+  <!-- Revisões Gerais D1/D7/D15/D30/D60 -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Revisões Gerais de Assuntos (D1 / D7 / D15 / D30 / D60)</div>
+        <div class="card-subtitle">Nenhuma revisão é concluída automaticamente; requer registro de recuperação ativa</div>
+      </div>
+    </div>
+    {% if revisoes_gerais %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Ciclo</th>
+            <th>Tópico ID</th>
+            <th>Data Prevista</th>
+            <th>Status</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in revisoes_gerais %}
+          <tr>
+            <td><span class="badge badge-warning">{{ r.ciclo_revisao }} ({{ r.intervalo_dias_aplicado }}d)</span></td>
+            <td>Tópico #{{ r.topico_id }}</td>
+            <td>{{ r.data_prevista.strftime('%d/%m/%Y') }}</td>
+            <td>
+              <span class="badge {% if r.status_revisao == 'CONCLUIDA' %}badge-success{% elif r.status_revisao == 'ATRASADA' %}badge-danger{% else %}badge-info{% endif %}">
+                {{ r.status_revisao }}
+              </span>
+            </td>
+            <td>
+              {% if r.status_revisao != 'CONCLUIDA' %}
+              <form method="post" action="/revisoes/{{ r.id }}/concluir" style="display: inline-flex; gap: 4px;">
+                <input type="hidden" name="duracao_minutos" value="25">
+                <input type="hidden" name="dificuldade" value="3">
+                <input type="hidden" name="confianca" value="ALTA">
+                <button type="submit" class="btn btn-sm btn-success">Concluir &amp; Agendar Próxima</button>
+              </form>
+              {% else %}
+              Realizada em {{ r.data_realizada.strftime('%d/%m/%Y') if r.data_realizada else '-' }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h4>Nenhuma revisão geral D1-D60 pendente</h4>
+      <p>Ao concluir o estudo de um tema novo no Meu Dia (Etapa 4), a revisão D1 é agendada automaticamente.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Flashcards com Algoritmo SM-2 (Seção 17) -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Flashcards de Recuperação Ativa (Algoritmo SM-2)</div>
+        <div class="card-subtitle">Clique em "Revelar Resposta" e avalie sua recordação (0 a 5) para agendar pelo SM-2</div>
+      </div>
+    </div>
+
+    {% for fc in flashcards %}
+    <div class="flashcard-box" id="flashcard-{{ fc.id }}">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <span class="badge badge-anpd">Algoritmo: {{ fc.algoritmo_utilizado }} &bull; EF: {{ fc.sm2_easiness_factor }} &bull; Intervalo: {{ fc.sm2_intervalo_dias }}d</span>
+        <span class="badge badge-neutral">Próxima: {{ fc.proxima_revisao_em.strftime('%d/%m/%Y') if fc.proxima_revisao_em else 'Hoje' }}</span>
+      </div>
+      <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">
+        P: {{ fc.frente_pergunta }}
+      </div>
+      <button type="button" class="btn btn-sm btn-secondary" onclick="toggleFlashcard({{ fc.id }})">
+        Revelar / Ocultar Resposta
+      </button>
+      <div class="flashcard-answer">
+        <p style="margin-bottom: 10px;"><strong>R:</strong> {{ fc.verso_resposta }}</p>
+        <form method="post" action="/revisoes/flashcards/{{ fc.id }}/sm2" style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button type="submit" name="qualidade_sm2" value="5" class="btn btn-sm btn-success">5 — Perfeito</button>
+          <button type="submit" name="qualidade_sm2" value="4" class="btn btn-sm btn-primary">4 — Seguro</button>
+          <button type="submit" name="qualidade_sm2" value="3" class="btn btn-sm btn-secondary">3 — Com esforço</button>
+          <button type="submit" name="qualidade_sm2" value="1" class="btn btn-sm btn-danger">1 — Esqueci (Reiniciar D1)</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- Criar Novo Flashcard -->
+    <form method="post" action="/revisoes/flashcards/novo" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+      <h4 style="font-size: 13.5px; margin-bottom: 8px;">Criar Novo Flashcard (Associado a Disciplina / Assunto / Legislação / Jurisprudência)</h4>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Disciplina *</label>
+          <select name="disciplina_id" required>
+            {% for d in disciplinas %}
+            <option value="{{ d.id }}">{{ d.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tópico</label>
+          <select name="topico_id">
+            {% for t in topicos %}
+            <option value="{{ t.id }}">{{ t.titulo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Frente (Pergunta de Recuperação Ativa) *</label>
+          <input type="text" name="frente_pergunta" placeholder="Pergunta objetiva..." required>
+        </div>
+        <div class="form-group">
+          <label>Verso (Resposta Fundamentada) *</label>
+          <input type="text" name="verso_resposta" placeholder="Resposta com artigo ou conceito..." required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Criar Flashcard SM-2</button>
+    </form>
+  </div>
+</div>
+
+<!-- Módulo de Simulados Adaptativos (Seção 18) -->
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Módulo de Simulados Adaptativos (Padrão Cebraspe ANPD e IAUPE SEFAZ-PE)</div>
+      <div class="card-subtitle">Concentra automaticamente maior proporção de assuntos que precisam de reforço e calcula pontuação líquida</div>
+    </div>
+  </div>
+
+  <form method="post" action="/simulados/criar" class="form-grid" style="align-items: end; margin-bottom: 20px;">
+    <div class="form-group">
+      <label>Título do Simulado *</label>
+      <input type="text" name="titulo" value="Simulado Adaptativo Integrado SEFAZ-PE &amp; ANPD" required>
+    </div>
+    <div class="form-group">
+      <label>Estilo da Banca</label>
+      <select name="banca_estilo">
+        <option value="Cebraspe (Certo/Errado - 1 erro anula 1 acerto)">Cebraspe (ANPD / Dados e TI)</option>
+        <option value="IAUPE/UPENET (Múltipla Escolha A-E)">IAUPE/UPENET (SEFAZ-PE)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Modo de Seleção</label>
+      <select name="modo_selecao">
+        <option value="ADAPTATIVO_PONTOS_FRACOS">Adaptativo (Foco em Assuntos com Erros/Reforço)</option>
+        <option value="PADRAO_EQUILIBRADO">Padrão Equilibrado (60% SEFAZ-PE / 40% ANPD+TI)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Quantidade de Questões</label>
+      <input type="number" name="quantidade_questoes" value="6" min="1" max="120">
+    </div>
+    <div class="form-group">
+      <label>Tempo (minutos)</label>
+      <input type="number" name="tempo_previsto_minutos" value="45" min="10">
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary">Montar Simulado Agora</button>
+    </div>
+  </form>
+
+  {% if simulado_ativo %}
+  <div style="border: 2px solid var(--color-primary); border-radius: var(--radius-md); padding: 16px; margin-bottom: 18px; background: var(--bg-surface-alt);">
+    <h3 style="font-size: 15.5px; margin-bottom: 4px;">Em Execução: {{ simulado_ativo.titulo }} ({{ simulado_ativo.banca_estilo }})</h3>
+    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">{{ simulado_ativo.origem_questoes_aviso }}</p>
+    <form method="post" action="/simulados/{{ simulado_ativo.id }}/finalizar">
+      {% for q in questoes_simulado_ativo %}
+      <div style="background: #ffffff; border: 1px solid var(--border-color); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 10px;">
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">
+          <strong>Item #{{ loop.index }}</strong> &bull; Origem: <span class="badge badge-info">{{ q.natureza_questao }}</span> ({{ q.concurso_referencia }} - {{ q.banca_nome }})
+        </div>
+        <p style="font-weight: 600; margin-bottom: 8px;">{{ q.enunciado }}</p>
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <label><input type="radio" name="q_{{ q.id }}" value="CERTO"> CERTO</label>
+          <label><input type="radio" name="q_{{ q.id }}" value="ERRADO"> ERRADO</label>
+          <label><input type="radio" name="q_{{ q.id }}" value="B"> Alternativa B</label>
+          <label><input type="radio" name="q_{{ q.id }}" value="BRANCO" checked> Deixar em Branco</label>
+        </div>
+      </div>
+      {% endfor %}
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <label style="font-size: 13px; font-weight: 600;">Tempo gasto (min):</label>
+        <input type="number" name="tempo_gasto_minutos" value="25" style="width: 90px;">
+        <button type="submit" class="btn btn-success">Finalizar Simulado e Calcular Desempenho</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if resultados_simulados %}
+  <h4 style="font-size: 14px; margin-bottom: 8px;">Histórico Comparável de Simulados Realizados</h4>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Simulado ID</th>
+          <th>Questões (C / E / Branco)</th>
+          <th>% Bruto</th>
+          <th>Escore Líquido Cebraspe</th>
+          <th>Pontos Fracos Identificados</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rs in resultados_simulados %}
+        <tr>
+          <td><strong>Simulado #{{ rs.simulado_id }}</strong> ({{ rs.tempo_gasto_minutos }} min)</td>
+          <td>{{ rs.total_questoes }} ({{ rs.acertos }}C / {{ rs.erros }}E / {{ rs.em_branco }}B)</td>
+          <td><strong>{{ rs.percentual_acerto }}%</strong></td>
+          <td><span class="badge badge-anpd">{{ rs.pontuacao_liquida_cebraspe }} pts líquidos</span></td>
+          <td><small>{{ rs.pontos_fracos_identificados_json }}</small></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

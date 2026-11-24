@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="grid-2">
+  <!-- Visão Semanal e Mensal do Planejamento Adaptativo (Seção 8) -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Calendário de Planejamento Adaptativo (Visão Semanal e Mensal)</div>
+        <div class="card-subtitle">Distribuição 60% SEFAZ-PE e 40% ANPD + Dados e TI &bull; Reorganização automática sem apagar histórico</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Etapa do Dia</th>
+            <th>Eixo</th>
+            <th>Atividade Planejada / Executada</th>
+            <th>Duração</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tarefas_calendario %}
+          <tr>
+            <td><strong>{{ t.data_programada.strftime('%d/%m/%Y') }}</strong></td>
+            <td>Etapa {{ t.etapa_meu_dia }}</td>
+            <td>
+              <span class="badge {% if t.eixo_estrategico == 'EIXO_1_SEFAZ_PE' %}badge-sefaz{% else %}badge-anpd{% endif %}">
+                {{ "SEFAZ-PE" if t.eixo_estrategico == "EIXO_1_SEFAZ_PE" else "ANPD+TI" }}
+              </span>
+            </td>
+            <td>
+              <strong>{{ t.titulo_tarefa }}</strong>
+              <div style="font-size: 11.5px; color: var(--text-muted);">{{ t.motivo_recomendacao[:110] }}...</div>
+            </td>
+            <td>{{ t.duracao_planejada_minutos }} min</td>
+            <td>
+              <span class="badge {% if t.status_tarefa == 'CONCLUIDA' %}badge-success{% else %}badge-warning{% endif %}">
+                {{ t.status_tarefa }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Nivelamento e Diagnóstico de Conhecimento (Seção 11) -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Nivelamento e Diagnóstico de Conhecimento</div>
+        <div class="card-subtitle">Regra 11: Não classifica como consolidado com base em uma única questão; exige amostra mínima</div>
+      </div>
+    </div>
+    <form method="post" action="/planejamento/nivelamento" style="margin-bottom: 18px;">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Disciplina *</label>
+          <select name="disciplina_id" required>
+            {% for d in disciplinas %}
+            <option value="{{ d.id }}">{{ d.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tópico Avaliado</label>
+          <select name="topico_id">
+            <option value="">-- Geral da Disciplina --</option>
+            {% for top in topicos %}
+            <option value="{{ top.id }}">{{ top.titulo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Questões Avaliadas *</label>
+          <input type="number" name="questoes_avaliadas" value="10" min="1" max="200" required>
+        </div>
+        <div class="form-group">
+          <label>Acertos *</label>
+          <input type="number" name="acertos" value="7" min="0" max="200" required>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Tempo Total (segundos)</label>
+          <input type="number" name="tempo_resposta_segundos" value="600" min="10">
+        </div>
+        <div class="form-group">
+          <label>Confiança</label>
+          <select name="confianca">
+            <option value="ALTA">Alta</option>
+            <option value="MEDIA" selected>Média</option>
+            <option value="BAIXA">Baixa</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Dificuldade Percebida (1 a 5)</label>
+          <select name="dificuldade_percebida">
+            <option value="2">2 — Fácil</option>
+            <option value="3" selected>3 — Média</option>
+            <option value="4">4 — Difícil</option>
+            <option value="5">5 — Muito Difícil</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Registrar Diagnóstico de Nivelamento</button>
+    </form>
+
+    {% if avaliacoes_nivelamento %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Questões / Acertos</th>
+            <th>Domínio Diagnosticado</th>
+            <th>Orientação para o Planejamento</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for av in avaliacoes_nivelamento %}
+          <tr>
+            <td>{{ av.data_avaliacao.strftime('%d/%m/%Y') }}</td>
+            <td>{{ av.acertos }} / {{ av.questoes_avaliadas }}</td>
+            <td><span class="badge badge-info">{{ av.classificacao_dominio }}</span></td>
+            <td>{{ av.recomendacao_gerada }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h4>Nenhum teste de nivelamento registrado ainda</h4>
+      <p>Registre uma bateria diagnóstica acima para calibrar o nível inicial das disciplinas.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Sistema de Metas e Alertas Configuráveis (Seção 22) -->
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Metas Configuráveis e Alertas do Sistema</div>
+      <div class="card-subtitle">Crie metas semanais, metas de questões ou alertas legislativos e de oportunidades</div>
+    </div>
+  </div>
+  <form method="post" action="/planejamento/meta" class="form-grid" style="align-items: end;">
+    <div class="form-group">
+      <label>Tipo</label>
+      <select name="tipo_registro">
+        <option value="META">META</option>
+        <option value="ALERTA">ALERTA</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Categoria</label>
+      <select name="categoria">
+        <option value="META_HORAS_SEMANAL">Meta de Horas Semanal</option>
+        <option value="META_QUESTOES_ASSUNTO">Meta de Questões por Assunto</option>
+        <option value="SIMULADO_PENDENTE">Simulado Pendente</option>
+        <option value="ATUALIZACAO_LEGISLATIVA">Atualização Legislativa</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Título *</label>
+      <input type="text" name="titulo" placeholder="Ex.: Resolver 40 itens Cebraspe de LGPD" required>
+    </div>
+    <div class="form-group">
+      <label>Descrição *</label>
+      <input type="text" name="descricao" placeholder="Critério objetivo de conclusão..." required>
+    </div>
+    <div class="form-group">
+      <label>Valor Alvo</label>
+      <input type="number" name="valor_alvo" value="20">
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary">Salvar Meta / Alerta</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

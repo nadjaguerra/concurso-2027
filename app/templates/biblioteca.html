@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Resumo da Indexação Real do Acervo (Seção 13) -->
+<div class="grid-kpi">
+  <div class="kpi-card">
+    <div class="kpi-label">Arquivos Físicos Indexados</div>
+    <div class="kpi-value">{{ total_indexados }}</div>
+    <div class="kpi-meta">Nas 6 pastas oficiais do acervo (0 arquivos movidos ou alterados)</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Aprovados para Estudo / Referência</div>
+    <div class="kpi-value" style="color: var(--color-success);">{{ total_aprovados }}</div>
+    <div class="kpi-meta">Integridade binária e hash SHA-256 conferidos</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">PDFs Digitalizados (Sem Camada OCR)</div>
+    <div class="kpi-value">{{ total_digitalizados }}</div>
+    <div class="kpi-meta">Identificados automaticamente pelo extrator</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Arquivos com Falha / Shell SPA</div>
+    <div class="kpi-value" style="color: var(--color-warning);">{{ total_falhas }}</div>
+    <div class="kpi-meta">Sinalizados e preservados conforme regra de integridade</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Biblioteca Documental e Busca por Nome ou Conteúdo Extraído</div>
+      <div class="card-subtitle">Pesquisa transversal em PDFs, HTMLs, Markdown, CSV, XLSX e NDJSON das 6 pastas oficiais</div>
+    </div>
+    <form method="post" action="/biblioteca/reindexar" style="display: inline;">
+      <button type="submit" class="btn btn-sm btn-secondary">&#8635; Revalidar Existência e Índice em Disco</button>
+    </form>
+  </div>
+
+  <!-- Filtros e Pesquisa Textual -->
+  <form method="get" action="/biblioteca" class="form-grid" style="align-items: end; margin-bottom: 16px;">
+    <div class="form-group">
+      <label>Pesquisar por Nome ou Conteúdo Extraído</label>
+      <input type="text" name="q" value="{{ q or '' }}" placeholder="Ex.: LGPD, FASAF, 14.133, ANATEL, MCASP, Cookies...">
+    </div>
+    <div class="form-group">
+      <label>Pasta Oficial do Acervo</label>
+      <select name="pasta">
+        <option value="">Todas as 6 Pastas Oficiais</option>
+        {% for p in pastas_oficiais %}
+        <option value="{{ p }}" {% if filtro_pasta == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Tipo de Material</label>
+      <select name="tipo">
+        <option value="">Todos os Tipos</option>
+        <option value="EDITAL" {% if filtro_tipo == 'EDITAL' %}selected{% endif %}>Editais e Termos de Referência</option>
+        <option value="LEGISLACAO" {% if filtro_tipo == 'LEGISLACAO' %}selected{% endif %}>Legislação (HTML/PDF)</option>
+        <option value="GUIA_MANUAL" {% if filtro_tipo == 'GUIA_MANUAL' %}selected{% endif %}>Guias e Manuais Oficiais</option>
+        <option value="PROVA_OBJETIVA" {% if filtro_tipo == 'PROVA_OBJETIVA' %}selected{% endif %}>Provas Objetivas</option>
+        <option value="PROVA_DISCURSIVA" {% if filtro_tipo == 'PROVA_DISCURSIVA' %}selected{% endif %}>Provas Discursivas</option>
+        <option value="GABARITO" {% if filtro_tipo == 'GABARITO' %}selected{% endif %}>Gabaritos Oficiais</option>
+        <option value="RELATORIO_INVENTARIO" {% if filtro_tipo == 'RELATORIO_INVENTARIO' %}selected{% endif %}>Relatórios e Inventários</option>
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary">Buscar no Acervo</button>
+      <a href="/biblioteca" class="btn btn-secondary">Limpar</a>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Título &amp; Caminho Real Verificado</th>
+          <th>Pasta / Tipo</th>
+          <th>Formato &amp; Leitura Técnica</th>
+          <th>Classificação de Utilidade</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in materiais %}
+        <tr>
+          <td>
+            <strong>{{ m.titulo_catalogo }}</strong>
+            <div style="font-family: var(--font-mono); font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+              {{ m.caminho_relativo }} ({{ (m.tamanho_bytes / 1024)|round(1) }} KB)
+            </div>
+            {% if m.caminho_historico_inventario and '01_DOCUMENTOS' in m.caminho_historico_inventario %}
+            <div style="font-size: 11px; color: var(--color-info);">
+              &#10003; Reconciliado com caminho histórico do inventário sem mover o original.
+            </div>
+            {% endif %}
+            {% if m.texto_extraido_amostra %}
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px; background: var(--bg-surface-alt); padding: 4px 8px; border-radius: 4px;">
+              <strong>Trecho extraído:</strong> {{ m.texto_extraido_amostra[:190] }}...
+            </div>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge badge-neutral">{{ m.pasta_acervo }}</span><br>
+            <small><strong>{{ m.tipo_material }}</strong></small>
+          </td>
+          <td>
+            <span class="badge {% if m.falha_leitura %}badge-danger{% elif m.eh_digitalizado_sem_texto %}badge-warning{% else %}badge-success{% endif %}">
+              {{ m.formato_real_verificado }}
+            </span>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 3px;">
+              {{ m.detalhe_leitura }}
+            </div>
+          </td>
+          <td>
+            <span class="badge {% if '1. APROVADO' in m.classificacao_utilidade %}badge-success{% elif '2. APROVADO' in m.classificacao_utilidade %}badge-info{% elif '8. DUPLICADO' in m.classificacao_utilidade or '7. IRRELEVANTE' in m.classificacao_utilidade %}badge-warning{% else %}badge-neutral{% endif %}">
+              {{ m.classificacao_utilidade }}
+            </span>
+            {% if m.alerta_auditoria %}
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">{{ m.alerta_auditoria }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <a href="/biblioteca/abrir/{{ m.id }}" target="_blank" class="btn btn-sm btn-primary">Abrir Original</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

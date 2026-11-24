@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- KPIs Principais do Dashboard (Seção 6) -->
+<div class="grid-kpi">
+  <div class="kpi-card">
+    <div class="kpi-label">Progresso Geral da Matriz</div>
+    <div class="kpi-value">{{ kpi.progresso_geral }}%</div>
+    <div class="progress-track">
+      <div class="progress-fill" style="width: {{ kpi.progresso_geral }}%;"></div>
+    </div>
+    <div class="kpi-meta">{{ kpi.topicos_concluidos }} de {{ kpi.total_topicos }} assuntos estudados ({{ kpi.topicos_dominados }} dominados)</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-label">Eixo 1 — SEFAZ-PE (Prioridade 60%)</div>
+    <div class="kpi-value" style="color: var(--eixo-sefaz);">{{ kpi.progresso_sefaz_pe }}%</div>
+    <div class="progress-track">
+      <div class="progress-fill sefaz" style="width: {{ kpi.progresso_sefaz_pe }}%;"></div>
+    </div>
+    <div class="kpi-meta">Analista de Apoio Administrativo &bull; {{ kpi.minutos_eixo1 }} min registrados</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-label">Eixo 2 — ANPD + Dados e TI (Prioridade 40%)</div>
+    <div class="kpi-value" style="color: var(--eixo-anpd);">{{ kpi.progresso_anpd_ti }}%</div>
+    <div class="progress-track">
+      <div class="progress-fill anpd" style="width: {{ kpi.progresso_anpd_ti }}%;"></div>
+    </div>
+    <div class="kpi-meta">Especialista ANPD (Cebraspe) + Dados/TI &bull; {{ kpi.minutos_eixo2 }} min registrados</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-label">Revisões &amp; Questões Reais</div>
+    <div class="kpi-value">
+      {% if kpi.taxa_acertos is not none %}
+        {{ kpi.taxa_acertos }}% acerto
+      {% else %}
+        Sem questões registradas
+      {% endif %}
+    </div>
+    <div class="kpi-meta">
+      {{ kpi.total_questoes_realizadas }} questões &bull;
+      <span class="badge {% if kpi.revisoes_atrasadas > 0 %}badge-danger{% else %}badge-success{% endif %}">
+        {{ kpi.revisoes_atrasadas }} atrasadas / {{ kpi.revisoes_hoje }} hoje
+      </span>
+    </div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-label">Tempo de Estudo &amp; Acervo</div>
+    <div class="kpi-value">{{ kpi.horas_totais }}h ({{ kpi.minutos_totais }} min)</div>
+    <div class="kpi-meta">
+      Semana: {{ kpi.minutos_semana }} min | Mês: {{ kpi.minutos_mes }} min &bull; {{ kpi.total_materiais }} arquivos indexados
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- Distribuição Estratégica 60% / 40% e Frente Tecnológica -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Distribuição Estratégica Obrigatória (60% / 40%)</div>
+        <div class="card-subtitle">Dados e TI integram o Eixo 2 da ANPD (sem criação de terceiro eixo)</div>
+      </div>
+      <a href="/disciplinas" class="btn btn-sm btn-secondary">Ver Matriz Integrada</a>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Eixo / Frente</th>
+          <th>Participação</th>
+          <th>Concurso / Escopo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-sefaz">EIXO 1 — SEFAZ-PE</span></td>
+          <td><strong>60% Global</strong></td>
+          <td>Analista de Apoio Administrativo às Atividades Fazendárias (Edital 001/2022 - IAUPE)</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-anpd">EIXO 2 — ANPD + DADOS E TI</span></td>
+          <td><strong>40% Global</strong></td>
+          <td>Especialista em Regulação de Proteção de Dados (Cebraspe) + Oportunidades Dados/TI</td>
+        </tr>
+        <tr>
+          <td colspan="3" style="background: var(--bg-surface-alt); font-size: 12px; font-weight: 600;">
+            Distribuição Interna da Frente Tecnológica (dentro dos 40% do Eixo 2):
+            Ciência de Dados e Estatística: <strong>30%</strong> &bull;
+            Engenharia de Dados: <strong>25%</strong> &bull;
+            Inteligência Artificial: <strong>25%</strong> &bull;
+            TI Geral: <strong>20%</strong>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Resumo Operacional do Meu Dia -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Sequência Diária — Meu Dia ({{ meu_dia.data_referencia.strftime('%d/%m/%Y') }})</div>
+        <div class="card-subtitle">Ordem obrigatória: 1. Revisões &rarr; 2. Conteúdo Novo (1-2) &rarr; 3. Jurisprudência/Súmula &rarr; 4. Registro</div>
+      </div>
+      <a href="/meu-dia" class="btn btn-sm btn-primary">Abrir Meu Dia</a>
+    </div>
+    <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px;">
+      <li>
+        <span class="badge badge-warning">Etapa 1 — Revisões</span>
+        {{ meu_dia.etapa_1_revisoes|length }} revisão(ões) programada(s) para hoje.
+      </li>
+      <li>
+        <span class="badge badge-sefaz">Etapa 2 — Conteúdo Novo</span>
+        {% for t2 in meu_dia.etapa_2_conteudos_novos %}
+          <div><strong>&bull; {{ t2.titulo_tarefa }}</strong> ({{ t2.duracao_planejada_minutos }} min)</div>
+        {% endfor %}
+      </li>
+      <li>
+        <span class="badge badge-anpd">Etapa 3 — Jurisprudência/Súmula (10-15 min)</span>
+        {% for t3 in meu_dia.etapa_3_jurisprudencia %}
+          <div><strong>&bull; {{ t3.titulo_tarefa }}</strong></div>
+        {% endfor %}
+      </li>
+      <li>
+        <span class="badge badge-success">Etapa 4 — Registro</span>
+        {{ meu_dia.etapa_4_sessoes_registradas|length }} sessão(ões) concluída(s) hoje ({{ meu_dia.total_minutos_realizados }} min).
+      </li>
+    </ul>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- Metas e Alertas Importantes -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Alertas Importantes e Metas Ativas</div>
+        <div class="card-subtitle">Monitoramento baseado em evidências reais do banco SQLite</div>
+      </div>
+      <a href="/planejamento" class="btn btn-sm btn-secondary">Gerenciar Metas</a>
+    </div>
+    {% if kpi.metas_alertas %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Título e Detalhamento</th>
+            <th>Prioridade</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ma in kpi.metas_alertas %}
+          <tr>
+            <td>
+              <span class="badge {% if ma.tipo_registro == 'ALERTA' %}badge-warning{% else %}badge-info{% endif %}">
+                {{ ma.tipo_registro }}
+              </span>
+            </td>
+            <td>
+              <strong>{{ ma.titulo }}</strong>
+              <div style="font-size: 12px; color: var(--text-muted);">{{ ma.descricao }}</div>
+            </td>
+            <td><span class="badge badge-neutral">{{ ma.prioridade }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><h4>Nenhum alerta pendente</h4></div>
+    {% endif %}
+  </div>
+
+  <!-- Assuntos com Maior Dificuldade / Caderno de Erros -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Assuntos com Maior Dificuldade / Erros Ativos</div>
+        <div class="card-subtitle">Erros alimentam automaticamente as recomendações de revisão</div>
+      </div>
+      <a href="/caderno-erros" class="btn btn-sm btn-secondary">Abrir Caderno de Erros</a>
+    </div>
+    {% if kpi.erros_ativos %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Referência</th>
+            <th>Categoria</th>
+            <th>Reincidências</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for err in kpi.erros_ativos[:5] %}
+          <tr>
+            <td>
+              <strong>{{ err.referencia_questao_externa }}</strong>
+              <div style="font-size: 12px; color: var(--text-muted);">{{ err.explicacao_correcao[:120] }}...</div>
+            </td>
+            <td><span class="badge badge-danger">{{ err.categoria_erro }}</span></td>
+            <td><strong>{{ err.reincidencias }}x</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h4>Nenhum erro pendente de superação registrado ainda</h4>
+      <p>Registre erros no módulo Questões ou Caderno de Erros para priorizar revisões automaticamente.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,69 @@
+# =====================================================================
+# 1. ACERVO DOCUMENTAL ORIGINAL (6 PASTAS OFICIAIS — NUNCA ENVIAR)
+# =====================================================================
+/01_EDITAIS_E_PLANEJAMENTO/
+/02_SEFAZ_PE/
+/03_ANPD/
+/04_DISCIPLINAS_E_LEGISLACAO/
+/05_PROVAS_E_GABARITOS/
+/06_MATERIAIS_E_INVENTARIO/*
+
+# Exceção apenas para os documentos técnicos de diagnóstico e arquitetura:
+!/06_MATERIAIS_E_INVENTARIO/DIAGNOSTICO_TECNICO_PLATAFORMA_2027.md
+!/06_MATERIAIS_E_INVENTARIO/ARQUITETURA_TECNICA_PLATAFORMA_2027.md
+
+# =====================================================================
+# 2. BLOQUEIO POR EXTENSÃO DOCUMENTAL E DE DADOS EM QUALQUER PASTA
+# =====================================================================
+*.pdf
+*.PDF
+*.xlsx
+*.xls
+*.csv
+*.ndjson
+*.docx
+*.doc
+
+# =====================================================================
+# 3. BANCO DE DADOS SQLITE E DADOS DE UTILIZAÇÃO PESSOAL
+# =====================================================================
+/data/
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite3-wal
+*.sqlite3-shm
+
+# =====================================================================
+# 4. BACKUPS E EXPORTAÇÕES
+# =====================================================================
+/backups/
+*.bak
+*.zip
+*.tar.gz
+
+# =====================================================================
+# 5. CREDENCIAIS, AMBIENTE VIRTUAL PYTHON E LOGS
+# =====================================================================
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.log
+/logs/
+
+# =====================================================================
+# 6. ARQUIVOS DE SISTEMA OPERACIONAL E EDITORES
+# =====================================================================
+Thumbs.db
+Desktop.ini
+.DS_Store

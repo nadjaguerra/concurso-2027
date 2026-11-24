@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page_title or "Metas do Dia" }} — Plataforma 2027</title>
+  <link rel="stylesheet" href="/static/css/design_system.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Menu Lateral Limpo em Bordô Mid-Century -->
+    <aside class="app-sidebar" aria-label="Menu Principal">
+      <div class="sidebar-brand">
+        <div class="brand-text">
+          <span class="brand-title">PLATAFORMA 2027</span>
+          <span class="brand-subtitle">SEFAZ-PE &bull; ANPD &amp; Dados</span>
+        </div>
+        <button type="button" id="sidebar-toggle" class="sidebar-toggle-btn" title="Recolher/Expandir Menu" aria-label="Alternar menu lateral">
+          &#9776;
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Hoje</div>
+        <a href="/meu-dia" class="nav-link {% if active_nav == 'meu_dia' %}active{% endif %}">
+          <span class="nav-icon">&#10022;</span>
+          <span class="nav-label">Metas do Dia</span>
+        </a>
+        <a href="/dashboard" class="nav-link {% if active_nav == 'dashboard' %}active{% endif %}">
+          <span class="nav-icon">&#9673;</span>
+          <span class="nav-label">Visão Geral</span>
+        </a>
+        <a href="/planejamento" class="nav-link {% if active_nav == 'planejamento' %}active{% endif %}">
+          <span class="nav-icon">&#128197;</span>
+          <span class="nav-label">Planejamento</span>
+        </a>
+
+        <div class="nav-section-title">Estudos</div>
+        <a href="/disciplinas" class="nav-link {% if active_nav == 'disciplinas' %}active{% endif %}">
+          <span class="nav-icon">&#128218;</span>
+          <span class="nav-label">Disciplinas &amp; Matriz</span>
+        </a>
+        <a href="/questoes" class="nav-link {% if active_nav == 'questoes' %}active{% endif %}">
+          <span class="nav-icon">&#10003;</span>
+          <span class="nav-label">Questões</span>
+        </a>
+        <a href="/caderno-erros" class="nav-link {% if active_nav == 'caderno_erros' %}active{% endif %}">
+          <span class="nav-icon">&#9888;</span>
+          <span class="nav-label">Caderno de Erros</span>
+        </a>
+        <a href="/revisoes" class="nav-link {% if active_nav == 'revisoes' %}active{% endif %}">
+          <span class="nav-icon">&#8635;</span>
+          <span class="nav-label">Revisões &amp; Flashcards</span>
+        </a>
+        <a href="/simulados" class="nav-link {% if active_nav == 'simulados' %}active{% endif %}">
+          <span class="nav-icon">&#9201;</span>
+          <span class="nav-label">Simulados</span>
+        </a>
+        <a href="/jurisprudencia" class="nav-link {% if active_nav == 'jurisprudencia' %}active{% endif %}">
+          <span class="nav-icon">&#9878;</span>
+          <span class="nav-label">Súmulas &amp; Jurisprudência</span>
+        </a>
+
+        <div class="nav-section-title">Acervo &amp; Gestão</div>
+        <a href="/biblioteca" class="nav-link {% if active_nav == 'biblioteca' %}active{% endif %}">
+          <span class="nav-icon">&#128193;</span>
+          <span class="nav-label">Biblioteca</span>
+        </a>
+        <a href="/legislacao" class="nav-link {% if active_nav == 'legislacao' %}active{% endif %}">
+          <span class="nav-icon">&#128220;</span>
+          <span class="nav-label">Legislação</span>
+        </a>
+        <a href="/editais" class="nav-link {% if active_nav == 'editais' %}active{% endif %}">
+          <span class="nav-icon">&#9733;</span>
+          <span class="nav-label">Editais &amp; Cobrança</span>
+        </a>
+        <a href="/desempenho" class="nav-link {% if active_nav == 'desempenho' %}active{% endif %}">
+          <span class="nav-icon">&#128200;</span>
+          <span class="nav-label">Desempenho</span>
+        </a>
+        <a href="/radar" class="nav-link {% if active_nav == 'radar' %}active{% endif %}">
+          <span class="nav-icon">&#128225;</span>
+          <span class="nav-label">Radar de Concursos</span>
+        </a>
+        <a href="/configuracoes" class="nav-link {% if active_nav == 'configuracoes' %}active{% endif %}">
+          <span class="nav-icon">&#9881;</span>
+          <span class="nav-label">Configurações</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Conteúdo Principal -->
+    <div class="app-main">
+      <header class="app-header">
+        <div class="header-context">
+          <h1>{{ page_title or "Metas do Dia" }}</h1>
+          <p>{{ page_subtitle or "Base sólida primeiro • Português todo dia • Meta 60 dias SEFAZ-PE" }}</p>
+        </div>
+        <div class="header-actions">
+          <div class="timer-widget" title="Cronômetro de sessão de estudo">
+            <span id="study-timer-display">00:00:00</span>
+            <button type="button" id="study-timer-toggle" class="btn btn-sm btn-primary">Iniciar</button>
+            <button type="button" id="study-timer-reset" class="btn btn-sm btn-secondary">Zerar</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="page-container">
+        {% if flash_message %}
+        <div class="alert-banner {{ flash_type or 'success' }}" role="status">
+          {{ flash_message }}
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <script src="/static/vendor/htmx.min.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

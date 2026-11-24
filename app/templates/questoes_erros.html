@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Indicadores Reais de Questões e Meta de 20 Questões por Assunto (Seção 15) -->
+<div class="grid-kpi">
+  <div class="kpi-card">
+    <div class="kpi-label">Total de Questões Realizadas</div>
+    <div class="kpi-value">{{ kpi.total_questoes_realizadas }}</div>
+    <div class="kpi-meta">{{ kpi.total_acertos }} acertos registrados</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Percentual Global de Acertos</div>
+    <div class="kpi-value">
+      {% if kpi.taxa_acertos is not none %}{{ kpi.taxa_acertos }}%{% else %}Sem registros{% endif %}
+    </div>
+    <div class="kpi-meta">Calculado exclusivamente sobre registros reais</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Meta Referência por Assunto</div>
+    <div class="kpi-value">20 questões</div>
+    <div class="kpi-meta">Meta ajustável por tópico na Matriz Integrada</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Erros Ativos no Caderno</div>
+    <div class="kpi-value" style="color: var(--color-danger);">{{ erros_caderno|length }}</div>
+    <div class="kpi-meta">Alimentam automaticamente as revisões do Meu Dia</div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- Registro de Resolução / Bateria no Qconcursos (Seção 15) -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Registrar Questão ou Bateria do Qconcursos / Prova Local</div>
+        <div class="card-subtitle">Integração manual rastreável com link externo do Qconcursos (sem simular API)</div>
+      </div>
+    </div>
+    <form method="post" action="/questoes/registrar-resposta">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Disciplina *</label>
+          <select name="disciplina_id" required>
+            {% for d in disciplinas %}
+            <option value="{{ d.id }}">{{ d.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Assunto / Tópico (Meta 20 questões)</label>
+          <select name="topico_id">
+            <option value="">-- Geral --</option>
+            {% for t in topicos %}
+            <option value="{{ t.id }}">{{ t.titulo }} (Meta: {{ t.meta_questoes }}q)</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Banca *</label>
+          <select name="banca_nome">
+            <option value="Cebraspe">Cebraspe (Prioridade ANPD / TI)</option>
+            <option value="IAUPE/UPENET">IAUPE/UPENET (SEFAZ-PE)</option>
+            <option value="FGV">FGV</option>
+            <option value="Cesgranrio">Cesgranrio (CNU / BNDES)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Concurso / Prova de Origem</label>
+          <input type="text" name="concurso_nome" placeholder="Ex.: ANATEL 2024 / SEFAZ-PE 2022">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Resposta Escolhida *</label>
+          <input type="text" name="resposta_escolhida" value="CERTO" required>
+        </div>
+        <div class="form-group">
+          <label>Gabarito Oficial *</label>
+          <input type="text" name="gabarito_correto" value="CERTO" required>
+        </div>
+        <div class="form-group">
+          <label>Confiança</label>
+          <select name="confianca">
+            <option value="SABIA">Sabia com segurança</option>
+            <option value="DUVIDA">Dúvida entre opções</option>
+            <option value="CHUTE">Chute (Envia para revisão)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tempo (segundos)</label>
+          <input type="number" name="tempo_segundos" value="90" min="5">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Link Externo Qconcursos / Fonte</label>
+          <input type="text" name="fonte_link_externo" placeholder="https://www.qconcursos.com/questoes-de-concursos/...">
+        </div>
+        <div class="form-group">
+          <label>Se errou/chutou: Categoria para o Caderno de Erros</label>
+          <select name="categoria_erro">
+            <option value="FALTA_CONHECIMENTO">Falta de conhecimento</option>
+            <option value="ESQUECIMENTO">Esquecimento</option>
+            <option value="INTERPRETACAO">Interpretação</option>
+            <option value="DESATENCAO">Desatenção</option>
+            <option value="CONFUSAO_CONCEITOS">Confusão entre conceitos</option>
+            <option value="DESCONHECIMENTO_LEGISLACAO">Desconhecimento da legislação</option>
+            <option value="ERRO_CALCULO">Erro de cálculo</option>
+            <option value="ERRO_ESTRATEGIA">Erro de estratégia</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>Comentário / Explicação da Correção</label>
+        <input type="text" name="comentarios" placeholder="Justificativa normativa ou conceitual da questão...">
+      </div>
+      <button type="submit" class="btn btn-primary">Registrar Resolução de Questão</button>
+    </form>
+  </div>
+
+  <!-- Cadastro Manual no Caderno de Erros (Seção 16) -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Registrar Diretamente no Caderno de Erros (8 Categorias)</div>
+        <div class="card-subtitle">Erros registrados priorizam automaticamente o assunto nas revisões e simulados adaptativos</div>
+      </div>
+    </div>
+    <form method="post" action="/caderno-erros/novo">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Questão ou Referência (Ex.: Qconcursos #Q2145980) *</label>
+          <input type="text" name="referencia_questao_externa" placeholder="Código Qconcursos ou item da prova PDF..." required>
+        </div>
+        <div class="form-group">
+          <label>Disciplina *</label>
+          <select name="disciplina_id" required>
+            {% for d in disciplinas %}
+            <option value="{{ d.id }}">{{ d.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Assunto / Tópico</label>
+          <select name="topico_id">
+            {% for t in topicos %}
+            <option value="{{ t.id }}">{{ t.titulo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Motivo / Categoria do Erro (8 Categorias) *</label>
+          <select name="categoria_erro" required>
+            <option value="FALTA_CONHECIMENTO">1. Falta de conhecimento</option>
+            <option value="ESQUECIMENTO">2. Esquecimento</option>
+            <option value="INTERPRETACAO">3. Interpretação</option>
+            <option value="DESATENCAO">4. Desatenção</option>
+            <option value="CONFUSAO_CONCEITOS">5. Confusão entre conceitos</option>
+            <option value="DESCONHECIMENTO_LEGISLACAO">6. Desconhecimento da legislação</option>
+            <option value="ERRO_CALCULO">7. Erro de cálculo</option>
+            <option value="ERRO_ESTRATEGIA">8. Erro de estratégia</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Alternativa Escolhida *</label>
+          <input type="text" name="alternativa_escolhida" placeholder="Ex.: ERRADO / Alternativa C" required>
+        </div>
+        <div class="form-group">
+          <label>Resposta Correta *</label>
+          <input type="text" name="resposta_correta" placeholder="Ex.: CERTO / Alternativa B" required>
+        </div>
+        <div class="form-group">
+          <label>Dificuldade</label>
+          <select name="dificuldade">
+            <option value="MEDIA">Média</option>
+            <option value="ALTA" selected>Alta</option>
+            <option value="CRITICA">Crítica</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Confiança</label>
+          <select name="confianca">
+            <option value="DUVIDA" selected>Dúvida</option>
+            <option value="CHUTE">Chute</option>
+            <option value="CERTEZA_EQUIVOCADA">Certeza Equivocada</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>Explicação Fundamentada &amp; Plano de Ação *</label>
+        <input type="text" name="explicacao_correcao" placeholder="Por que errei e qual dispositivo legal/conceito revisar..." required>
+      </div>
+      <button type="submit" class="btn btn-danger">Salvar no Caderno de Erros e Agendar Reforço</button>
+    </form>
+  </div>
+</div>
+
+<!-- Tabela do Caderno de Erros e Padrões de Erro -->
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Caderno de Erros Ativo &amp; Diagnóstico de Padrões</div>
+      <div class="card-subtitle">Acompanhe reincidências, explicação e marque revisões de superação</div>
+    </div>
+  </div>
+  {% if erros_caderno %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Questão / Referência</th>
+          <th>Categoria do Erro</th>
+          <th>Escolhida vs Correta</th>
+          <th>Explicação &amp; Revisões</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in erros_caderno %}
+        <tr>
+          <td>{{ e.data_erro.strftime('%d/%m/%Y') }}</td>
+          <td>
+            <strong>{{ e.referencia_questao_externa }}</strong>
+            {% if e.link_qconcursos %}
+            <div><a href="{{ e.link_qconcursos }}" target="_blank">Abrir Link Externo</a></div>
+            {% endif %}
+          </td>
+          <td><span class="badge badge-danger">{{ e.categoria_erro }}</span></td>
+          <td>Marcou: <strong>{{ e.alternativa_escolhida }}</strong><br>Correta: <strong>{{ e.resposta_correta }}</strong></td>
+          <td>
+            {{ e.explicacao_correcao }}<br>
+            <small>Revisões feitas: <strong>{{ e.revisoes_realizadas }}</strong> &bull; Reincidências: <strong>{{ e.reincidencias }}</strong></small>
+          </td>
+          <td>
+            {% if e.status_superacao == 'SUPERADO' %}
+              <span class="badge badge-success">Superado</span>
+            {% else %}
+              <form method="post" action="/caderno-erros/{{ e.id }}/revisar">
+                <button type="submit" class="btn btn-sm btn-success">Marcar Revisado</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h4>Caderno de Erros sem pendências no momento</h4>
+    <p>Questões erradas ou acertadas por chute serão listadas aqui com sua categoria e plano de revisão.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Banco Local de Questões Cadastradas -->
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Banco Local de Questões Cadastradas ({{ questoes_banco|length }} itens com origem identificada)</div>
+      <div class="card-subtitle">Utilizadas em baterias locais e no gerador de Simulados Adaptativos</div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID / Origem</th>
+          <th>Banca &amp; Concurso</th>
+          <th>Enunciado</th>
+          <th>Gabarito &amp; Fundamentação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for q in questoes_banco %}
+        <tr>
+          <td>
+            <strong>#{{ q.id }}</strong><br>
+            <span class="badge badge-info">{{ q.natureza_questao }}</span>
+          </td>
+          <td><strong>{{ q.banca_nome }}</strong><br><small>{{ q.concurso_referencia }}</small></td>
+          <td>{{ q.enunciado }}</td>
+          <td>
+            <span class="badge badge-success">Gabarito: {{ q.gabarito }}</span>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">{{ q.comentario_explicacao }}</div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

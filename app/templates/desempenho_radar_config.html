@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- 13. DESEMPENHO E PREVISÃO DE DOMÍNIO BASEADA EM EVIDÊNCIAS (Seção 19) -->
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Painel de Desempenho e Previsão de Domínio Baseada em Evidências Reais</div>
+      <div class="card-subtitle">
+        Regra 19 e 27: Quando não há amostra mínima (&ge; 5 questões ou &ge; 30 min), o sistema informa limitação de dados em vez de inventar estimativa
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Disciplina &amp; Eixo</th>
+          <th>Tempo Estudado</th>
+          <th>Questões (Acertos)</th>
+          <th>Taxa Real de Acerto</th>
+          <th>Erros Ativos</th>
+          <th>Previsão de Domínio &amp; Recomendação Justificada</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in relatorio_dominio %}
+        <tr>
+          <td>
+            <strong>{{ row.disciplina.nome }}</strong><br>
+            <span class="badge {% if row.disciplina.eixo_associado == 'EIXO_1_SEFAZ_PE' %}badge-sefaz{% elif row.disciplina.eixo_associado == 'EIXO_2_ANPD_TI' %}badge-anpd{% else %}badge-comum{% endif %}">
+              {{ row.disciplina.eixo_associado }}
+            </span>
+          </td>
+          <td>{{ row.minutos_estudados }} min</td>
+          <td>{{ row.questoes_resolvidas }} ({{ row.acertos }}C)</td>
+          <td>
+            {% if row.taxa_acerto is not none %}
+              <strong>{{ row.taxa_acerto }}%</strong>
+            {% else %}
+              <span style="color: var(--text-muted);">Sem amostra</span>
+            {% endif %}
+          </td>
+          <td>{{ row.erros_ativos }}</td>
+          <td>
+            <strong>{{ row.dominio_estimado }}</strong>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+              <em>Recomendação:</em> {{ row.recomendacao_justificada }}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 14. RADAR DE CONCURSOS (Seção 21) -->
+<div class="card" id="secao-radar">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Radar de Concursos e Oportunidades (SEFAZ-PE, ANPD, Ciência de Dados, Estatística, Engenharia de Dados, IA e TI)</div>
+      <div class="card-subtitle">
+        Regra 21: Separa informação oficial de expectativa; a inclusão no radar não altera a rotina diária sem análise e autorização
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap" style="margin-bottom: 18px;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Órgão / Concurso</th>
+          <th>Área &amp; Eixo</th>
+          <th>Banca</th>
+          <th>Situação Documentada</th>
+          <th>Compatibilidade (Formação / Assuntos)</th>
+          <th>Remuneração &amp; Fonte</th>
+          <th>Ativo na Rotina?</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in concursos_radar %}
+        <tr>
+          <td>
+            <strong>{{ c.sigla_orgao }}</strong> — {{ c.orgao }}
+            {% if c.link_oficial %}
+            <div><a href="{{ c.link_oficial }}" target="_blank" style="font-size: 11.5px;">Link Oficial</a></div>
+            {% endif %}
+          </td>
+          <td>{{ c.area_foco }}<br><small>{{ c.eixo_estrategico }}</small></td>
+          <td>{{ c.banca.sigla if c.banca else "A definir" }}</td>
+          <td><span class="badge badge-info">{{ c.status_concurso }}</span></td>
+          <td>
+            Formação: <strong>{{ c.compatibilidade_formacao }}%</strong><br>
+            Assuntos: <strong>{{ c.compatibilidade_assuntos }}%</strong>
+          </td>
+          <td>
+            {{ c.remuneracao_informada or "Não informada em fonte oficial" }}<br>
+            <small style="color: var(--text-muted);">Fonte: {{ c.fonte_remuneracao or "Pendente" }}</small>
+          </td>
+          <td>
+            {% if c.ativo_no_planejamento %}
+              <span class="badge badge-success">Núcleo Ativo ({{ c.peso_estrategico_percentual|int }}%)</span>
+            {% else %}
+              <span class="badge badge-neutral">Monitorado no Radar</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Cadastrar Nova Oportunidade no Radar -->
+  <form method="post" action="/radar/novo">
+    <h4 style="font-size: 13.5px; margin-bottom: 10px;">Adicionar Oportunidade ao Radar (Sem alterar rotina de estudos automaticamente)</h4>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Código Único *</label>
+        <input type="text" name="codigo" placeholder="Ex.: DATAPREV_CD_2027" required>
+      </div>
+      <div class="form-group">
+        <label>Sigla do Órgão *</label>
+        <input type="text" name="sigla_orgao" placeholder="Ex.: DATAPREV" required>
+      </div>
+      <div class="form-group">
+        <label>Nome do Órgão *</label>
+        <input type="text" name="orgao" placeholder="Empresa de Tecnologia e Informações da Previdência" required>
+      </div>
+      <div class="form-group">
+        <label>Área Tecnológica / Foco *</label>
+        <select name="area_foco">
+          <option value="Ciência de Dados e Estatística">Ciência de Dados e Estatística</option>
+          <option value="Engenharia de Dados e Analytics">Engenharia de Dados e Analytics</option>
+          <option value="Inteligência Artificial">Inteligência Artificial</option>
+          <option value="Tecnologia da Informação Geral">Tecnologia da Informação Geral</option>
+          <option value="Gestão Fazendária / Apoio Administrativo">Gestão Fazendária / Apoio Administrativo</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Situação (Oficial vs Expectativa) *</label>
+        <select name="status_concurso">
+          <option value="OFICIAL_PUBLICADO">Oficial — Edital Publicado</option>
+          <option value="AUTORIZADO_ANUNCIADO">Autorizado / Banca Contratada (Sem Edital)</option>
+          <option value="HISTORICO">Histórico de Referência</option>
+          <option value="PROJECAO_EXPECTATIVA">Projeção ou Expectativa (Não confirmada oficialmente)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Compatibilidade com Formação (%)</label>
+        <input type="number" name="compatibilidade_formacao" value="90" min="0" max="100">
+      </div>
+      <div class="form-group">
+        <label>Remuneração (somente se houver fonte)</label>
+        <input type="text" name="remuneracao_informada" placeholder="Informe valor e edital/lei de origem...">
+      </div>
+      <div class="form-group">
+        <label>Link / Fonte Oficial</label>
+        <input type="text" name="link_oficial" placeholder="https://...">
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">Registrar Oportunidade no Radar</button>
+  </form>
+</div>
+
+<!-- 15. CONFIGURAÇÕES, BACKUPS ATÔMICOS E SEGURANÇA (Seções 24 e 25) -->
+<div class="card" id="secao-configuracoes">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Configurações Estratégicas, Backup Atômico SQLite e Segurança GitHub Privado</div>
+      <div class="card-subtitle">Backups com verificação PRAGMA integrity_check e manifesto SHA-256 &bull; Proteção rigorosa via .gitignore</div>
+    </div>
+    <form method="post" action="/configuracoes/backup-agora" style="display: inline;">
+      <button type="submit" class="btn btn-success">&#128190; Gerar Backup Atômico SQLite Agora</button>
+    </form>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <h4 style="font-size: 14px; margin-bottom: 8px;">Parâmetros Persistidos no Banco SQLite</h4>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Chave</th>
+            <th>Valor Atual</th>
+            <th>Descrição</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cfg in configuracoes %}
+          <tr>
+            <td><code>{{ cfg.chave }}</code></td>
+            <td><strong>{{ cfg.valor_json }}</strong></td>
+            <td>{{ cfg.descricao }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h4 style="font-size: 14px; margin-bottom: 8px;">Snapshots de Backup Local em <code>/backups</code> (Ignorados pelo Git)</h4>
+      {% if arquivos_backup %}
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Arquivo de Backup</th>
+            <th>Tamanho</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in arquivos_backup %}
+          <tr>
+            <td><code>{{ b.nome }}</code></td>
+            <td>{{ b.tamanho_kb }} KB</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <h4>Nenhum snapshot gerado ainda nesta sessão</h4>
+        <p>Clique em "Gerar Backup Atômico SQLite Agora" acima para criar um backup verificado.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

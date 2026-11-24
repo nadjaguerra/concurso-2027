@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Comparativo Estratégico de Editais (Seção 9) -->
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Editais, Termos de Referência e Comparação de Cobertura</div>
+      <div class="card-subtitle">Eixo 1: SEFAZ-PE (60%) vs Eixo 2: ANPD + Dados e TI (40%) &bull; Identificação de conteúdos comuns e exclusivos</div>
+    </div>
+    <span class="badge badge-comum">{{ total_comuns }} Assuntos Comuns Reutilizados &bull; {{ total_exclusivos }} Assuntos Exclusivos</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Concurso / Órgão</th>
+          <th>Eixo &amp; Peso</th>
+          <th>Cargo-Alvo</th>
+          <th>Banca</th>
+          <th>Documento de Referência</th>
+          <th>Situação Oficial</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in concursos %}
+        <tr>
+          <td><strong>{{ c.sigla_orgao }}</strong> — {{ c.orgao }}</td>
+          <td>
+            <span class="badge {% if c.eixo_estrategico == 'EIXO_1_SEFAZ_PE' %}badge-sefaz{% else %}badge-anpd{% endif %}">
+              {{ "Eixo 1 (60%)" if c.eixo_estrategico == "EIXO_1_SEFAZ_PE" else "Eixo 2 (40%)" }}
+            </span>
+          </td>
+          <td>
+            {% for cg in c.cargos %}
+              <div><strong>{{ cg.nome_cargo }}</strong> ({{ cg.vagas_imediatas or 0 }} vagas)</div>
+            {% endfor %}
+          </td>
+          <td>{{ c.banca.sigla if c.banca else "A definir" }}</td>
+          <td>
+            {% for ed in c.editais %}
+              <div><strong>{{ ed.titulo }}</strong> ({{ ed.natureza_referencia }})</div>
+              <div style="font-size: 11.5px; color: var(--text-muted);">{{ ed.resumo_estrutura_prova }}</div>
+            {% else %}
+              <span style="color: var(--text-muted);">Referência por provas/editais do acervo</span>
+            {% endfor %}
+          </td>
+          <td><span class="badge badge-info">{{ c.status_concurso }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Inteligência de Cobrança e Histórico de Provas Anteriores (Seção 10) -->
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Inteligência de Cobrança e Histórico de Provas do Acervo</div>
+      <div class="card-subtitle">
+        Análise baseada em evidências diretas das provas oficiais em 05_PROVAS_E_GABARITOS (com método, confiança e limitações explícitas)
+      </div>
+    </div>
+  </div>
+
+  <div class="alert-banner info">
+    <strong>Nota Metodológica e Limitações (Regra 10):</strong> As frequências abaixo derivam exclusivamente das provas e gabaritos oficiais auditados no acervo local (SEFAZ-PE 2022 IAUPE, ANATEL 2024 Cebraspe, SERPRO 2021/2023 Cebraspe, TCU 2025/2026 Cebraspe, UNEAL 2026 Cebraspe, EMBRAPA 2025). Não representam previsão garantida para editais futuros.
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Banca &amp; Concurso</th>
+          <th>Cargo &amp; Ano</th>
+          <th>Assunto Cobrado</th>
+          <th>Questões / Prova</th>
+          <th>Frequência</th>
+          <th>Recorrência &amp; Evidência Utilizada</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in historico_cobranca %}
+        <tr>
+          <td>
+            <span class="badge badge-neutral">{{ h.banca_sigla }}</span><br>
+            <strong>{{ h.concurso_nome }}</strong>
+          </td>
+          <td>{{ h.cargo_nome }} ({{ h.ano_prova }})</td>
+          <td><strong>{{ h.assunto_cobrado }}</strong></td>
+          <td>{{ h.quantidade_questoes_assunto }} / {{ h.total_questoes_prova }}</td>
+          <td><strong>{{ h.frequencia_percentual }}%</strong></td>
+          <td>
+            <span class="badge badge-success">{{ h.classificacao_recorrencia }}</span>
+            <span class="badge badge-info">{{ h.quantidade_provas_analisadas }} prova(s) ({{ h.periodo_considerado }})</span>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">
+              <strong>Evidência:</strong> {{ h.evidencias_utilizadas }}<br>
+              <strong>Método:</strong> {{ h.metodo_utilizado }} &bull; <strong>Confiança:</strong> {{ h.nivel_confianca_analise }}
+            </div>
+            {% if h.material_prova_id %}
+            <div style="margin-top: 4px;">
+              <a href="/biblioteca/abrir/{{ h.material_prova_id }}" target="_blank" class="btn btn-sm btn-secondary">Abrir Prova PDF Original</a>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
